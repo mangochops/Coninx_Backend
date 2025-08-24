@@ -1,0 +1,276 @@
+{
+	"info": {
+		"_postman_id": "8d24a32d-8d78-4fab-a9c2-21d1ae0e6d0d",
+		"name": "Coninx",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "34322653"
+	},
+	"item": [
+		{
+			"name": "SuperAdmin",
+			"item": [
+				{
+					"name": "Auth",
+					"item": [
+						{
+							"name": "Register",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{backend_url}}admin/register/",
+									"host": [
+										"{{backend_url}}admin"
+									],
+									"path": [
+										"register",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Login",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{backend_url}}admin/login",
+									"host": [
+										"{{backend_url}}admin"
+									],
+									"path": [
+										"login"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Dispatch",
+					"item": [
+						{
+							"name": "Create Dispatch",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{backend_url}}admin/dispatch/",
+									"host": [
+										"{{backend_url}}admin"
+									],
+									"path": [
+										"dispatch",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Track Dispatch",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{backend_url}}admin/dispatch/",
+									"host": [
+										"{{backend_url}}admin"
+									],
+									"path": [
+										"dispatch",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Update Dispatch",
+							"request": {
+								"method": "PUT",
+								"header": [],
+								"url": {
+									"raw": "{{backend_url}}admin/dispatch/",
+									"host": [
+										"{{backend_url}}admin"
+									],
+									"path": [
+										"dispatch",
+										""
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Driver",
+			"item": [
+				{
+					"name": "Auth",
+					"item": [
+						{
+							"name": "Create Profile",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{backend_url}}driver/register/",
+									"host": [
+										"{{backend_url}}driver"
+									],
+									"path": [
+										"register",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Login",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{backend_url}}driver/register/",
+									"host": [
+										"{{backend_url}}driver"
+									],
+									"path": [
+										"register",
+										""
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Trip",
+					"item": [
+						{
+							"name": "Create Trip",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{backend_url}}driver/trip/",
+									"host": [
+										"{{backend_url}}driver"
+									],
+									"path": [
+										"trip",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Get Trips",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{backend_url}}driver/trip/",
+									"host": [
+										"{{backend_url}}driver"
+									],
+									"path": [
+										"trip",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Update Trip",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{backend_url}}driver/trip/{id}",
+									"host": [
+										"{{backend_url}}driver"
+									],
+									"path": [
+										"trip",
+										"{id}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Get Trip",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{backend_url}}driver/trip/{id}",
+									"host": [
+										"{{backend_url}}driver"
+									],
+									"path": [
+										"trip",
+										"{id}"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Client",
+			"item": [
+				{
+					"name": "Auth",
+					"item": [
+						{
+							"name": "Create Customer",
+							"request": {
+								"method": "POST",
+								"header": []
+							},
+							"response": []
+						},
+						{
+							"name": "Get Customer",
+							"request": {
+								"method": "GET",
+								"header": []
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Trip",
+					"item": [
+						{
+							"name": "End trip",
+							"request": {
+								"method": "POST",
+								"header": []
+							},
+							"response": []
+						}
+					]
+				}
+			]
+		}
+	]
+}
