@@ -3,6 +3,8 @@ package Admin
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/gorilla/mux"
 )
 
 type Register struct {
@@ -42,4 +44,10 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	// TODO: Authenticate user with database
 	w.Write([]byte("User " + creds.Email + " logged in!"))
+}
+
+// RegisterAuthRoutes registers the auth endpoints to the router
+func RegisterAuthRoutes(r *mux.Router) {
+	r.HandleFunc("/signup", SignupHandler).Methods("POST")
+	r.HandleFunc("/login", LoginHandler).Methods("POST")
 }
