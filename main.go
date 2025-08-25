@@ -12,6 +12,7 @@ import (
 	"github.com/mangochops/coninx_backend/Admin"
 	"github.com/mangochops/coninx_backend/Driver"
 	
+	
 )
 
 func main() {
@@ -43,6 +44,9 @@ func main() {
 	Driver.RegisterDriverRoutes(r)
 	// Driver.trip
 	Driver.RegisterTripRoutes(r)
+
+	// Driver.delivery
+	Driver.RegisterDeliveryRoutes(r)
 
 	// Start server
 	fmt.Println("Server running on :8080")
