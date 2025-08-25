@@ -2,8 +2,7 @@
 	"info": {
 		"_postman_id": "8d24a32d-8d78-4fab-a9c2-21d1ae0e6d0d",
 		"name": "Coninx",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-		"_exporter_id": "34322653"
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
 		{
@@ -18,34 +17,33 @@
 								"method": "POST",
 								"header": [],
 								"url": {
-									"raw": "{{backend_url}}admin/register/",
+									"raw": "{{backend_url}}/admin/signup",
 									"host": [
-										"{{backend_url}}admin"
+										"{{backend_url}}"
 									],
 									"path": [
-										"register",
-										""
+										"admin",
+										"signup"
 									]
 								}
-							},
-							"response": []
+							}
 						},
 						{
 							"name": "Login",
 							"request": {
-								"method": "GET",
+								"method": "POST",
 								"header": [],
 								"url": {
-									"raw": "{{backend_url}}admin/login",
+									"raw": "{{backend_url}}/admin/login",
 									"host": [
-										"{{backend_url}}admin"
+										"{{backend_url}}"
 									],
 									"path": [
+										"admin",
 										"login"
 									]
 								}
-							},
-							"response": []
+							}
 						}
 					]
 				},
@@ -58,35 +56,51 @@
 								"method": "POST",
 								"header": [],
 								"url": {
-									"raw": "{{backend_url}}admin/dispatch/",
+									"raw": "{{backend_url}}/admin/dispatch",
 									"host": [
-										"{{backend_url}}admin"
+										"{{backend_url}}"
 									],
 									"path": [
-										"dispatch",
-										""
+										"admin",
+										"dispatch"
 									]
 								}
-							},
-							"response": []
+							}
 						},
 						{
-							"name": "Track Dispatch",
+							"name": "Get All Dispatches",
 							"request": {
 								"method": "GET",
 								"header": [],
 								"url": {
-									"raw": "{{backend_url}}admin/dispatch/",
+									"raw": "{{backend_url}}/admin/dispatch",
 									"host": [
-										"{{backend_url}}admin"
+										"{{backend_url}}"
 									],
 									"path": [
-										"dispatch",
-										""
+										"admin",
+										"dispatch"
 									]
 								}
-							},
-							"response": []
+							}
+						},
+						{
+							"name": "Get Dispatch By ID",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{backend_url}}/admin/dispatch/:id",
+									"host": [
+										"{{backend_url}}"
+									],
+									"path": [
+										"admin",
+										"dispatch",
+										":id"
+									]
+								}
+							}
 						},
 						{
 							"name": "Update Dispatch",
@@ -94,17 +108,35 @@
 								"method": "PUT",
 								"header": [],
 								"url": {
-									"raw": "{{backend_url}}admin/dispatch/",
+									"raw": "{{backend_url}}/admin/dispatch/:id",
 									"host": [
-										"{{backend_url}}admin"
+										"{{backend_url}}"
 									],
 									"path": [
+										"admin",
 										"dispatch",
-										""
+										":id"
 									]
 								}
-							},
-							"response": []
+							}
+						},
+						{
+							"name": "Delete Dispatch",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{backend_url}}/admin/dispatch/:id",
+									"host": [
+										"{{backend_url}}"
+									],
+									"path": [
+										"admin",
+										"dispatch",
+										":id"
+									]
+								}
+							}
 						}
 					]
 				}
@@ -117,40 +149,38 @@
 					"name": "Auth",
 					"item": [
 						{
-							"name": "Create Profile",
+							"name": "Register",
 							"request": {
 								"method": "POST",
 								"header": [],
 								"url": {
-									"raw": "{{backend_url}}driver/register/",
+									"raw": "{{backend_url}}/driver/register",
 									"host": [
-										"{{backend_url}}driver"
+										"{{backend_url}}"
 									],
 									"path": [
-										"register",
-										""
+										"driver",
+										"register"
 									]
 								}
-							},
-							"response": []
+							}
 						},
 						{
 							"name": "Login",
 							"request": {
-								"method": "GET",
+								"method": "POST",
 								"header": [],
 								"url": {
-									"raw": "{{backend_url}}driver/register/",
+									"raw": "{{backend_url}}/driver/login",
 									"host": [
-										"{{backend_url}}driver"
+										"{{backend_url}}"
 									],
 									"path": [
-										"register",
-										""
+										"driver",
+										"login"
 									]
 								}
-							},
-							"response": []
+							}
 						}
 					]
 				},
@@ -163,53 +193,16 @@
 								"method": "POST",
 								"header": [],
 								"url": {
-									"raw": "{{backend_url}}driver/trip/",
+									"raw": "{{backend_url}}/driver/trip",
 									"host": [
-										"{{backend_url}}driver"
+										"{{backend_url}}"
 									],
 									"path": [
-										"trip",
-										""
+										"driver",
+										"trip"
 									]
 								}
-							},
-							"response": []
-						},
-						{
-							"name": "Get Trips",
-							"request": {
-								"method": "GET",
-								"header": [],
-								"url": {
-									"raw": "{{backend_url}}driver/trip/",
-									"host": [
-										"{{backend_url}}driver"
-									],
-									"path": [
-										"trip",
-										""
-									]
-								}
-							},
-							"response": []
-						},
-						{
-							"name": "Update Trip",
-							"request": {
-								"method": "GET",
-								"header": [],
-								"url": {
-									"raw": "{{backend_url}}driver/trip/{id}",
-									"host": [
-										"{{backend_url}}driver"
-									],
-									"path": [
-										"trip",
-										"{id}"
-									]
-								}
-							},
-							"response": []
+							}
 						},
 						{
 							"name": "Get Trip",
@@ -217,17 +210,55 @@
 								"method": "GET",
 								"header": [],
 								"url": {
-									"raw": "{{backend_url}}driver/trip/{id}",
+									"raw": "{{backend_url}}/driver/trip/:id",
 									"host": [
-										"{{backend_url}}driver"
+										"{{backend_url}}"
 									],
 									"path": [
+										"driver",
 										"trip",
-										"{id}"
+										":id"
 									]
 								}
-							},
-							"response": []
+							}
+						},
+						{
+							"name": "Update Trip Coordinates",
+							"request": {
+								"method": "PUT",
+								"header": [],
+								"url": {
+									"raw": "{{backend_url}}/driver/trip/:id/coordinates",
+									"host": [
+										"{{backend_url}}"
+									],
+									"path": [
+										"driver",
+										"trip",
+										":id",
+										"coordinates"
+									]
+								}
+							}
+						},
+						{
+							"name": "Update Trip Status",
+							"request": {
+								"method": "PUT",
+								"header": [],
+								"url": {
+									"raw": "{{backend_url}}/driver/trip/:id/status",
+									"host": [
+										"{{backend_url}}"
+									],
+									"path": [
+										"driver",
+										"trip",
+										":id",
+										"status"
+									]
+								}
+							}
 						}
 					]
 				}
@@ -237,36 +268,79 @@
 			"name": "Client",
 			"item": [
 				{
-					"name": "Auth",
+					"name": "Delivery",
 					"item": [
 						{
-							"name": "Create Customer",
+							"name": "Create Delivery",
 							"request": {
 								"method": "POST",
-								"header": []
-							},
-							"response": []
+								"header": [],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "deliveryNote",
+											"type": "file",
+											"src": ""
+										},
+										{
+											"key": "recipient",
+											"type": "text",
+											"value": ""
+										},
+										{
+											"key": "condition",
+											"type": "text",
+											"value": ""
+										}
+									]
+								},
+								"url": {
+									"raw": "{{backend_url}}/client/delivery",
+									"host": [
+										"{{backend_url}}"
+									],
+									"path": [
+										"client",
+										"delivery"
+									]
+								}
+							}
 						},
 						{
-							"name": "Get Customer",
+							"name": "Get Delivery",
 							"request": {
 								"method": "GET",
-								"header": []
-							},
-							"response": []
-						}
-					]
-				},
-				{
-					"name": "Trip",
-					"item": [
+								"header": [],
+								"url": {
+									"raw": "{{backend_url}}/client/delivery/:id",
+									"host": [
+										"{{backend_url}}"
+									],
+									"path": [
+										"client",
+										"delivery",
+										":id"
+									]
+								}
+							}
+						},
 						{
-							"name": "End trip",
+							"name": "List Deliveries",
 							"request": {
-								"method": "POST",
-								"header": []
-							},
-							"response": []
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{backend_url}}/client/deliveries",
+									"host": [
+										"{{backend_url}}"
+									],
+									"path": [
+										"client",
+										"deliveries"
+									]
+								}
+							}
 						}
 					]
 				}
