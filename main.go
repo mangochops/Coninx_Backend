@@ -10,6 +10,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5"
 	"github.com/mangochops/coninx_backend/Admin"
+	"github.com/mangochops/coninx_backend/Driver"
+	
 )
 
 func main() {
@@ -38,7 +40,9 @@ func main() {
 	Admin.RegisterDispatchRoutes(r)
 
 	// Driver.auth
-
+	Driver.RegisterDriverRoutes(r)
+	// Driver.trip
+	Driver.RegisterTripRoutes(r)
 
 	// Start server
 	fmt.Println("Server running on :8080")
