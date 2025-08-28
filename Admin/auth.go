@@ -87,7 +87,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 // RegisterAuthRoutes registers the auth endpoints to the router
 func RegisterAuthRoutes(r *mux.Router) {
-	r.HandleFunc("/admin/register", SignupHandler).Methods("POST")
-	r.HandleFunc("/admin/login", LoginHandler).Methods("POST")
+	r.HandleFunc("/register", SignupHandler).Methods("POST")
+	r.HandleFunc("/login", LoginHandler).Methods("POST")
 }
 

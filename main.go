@@ -36,7 +36,7 @@ func main() {
 
 	// Pass the db connection to Admin package
 	Admin.InitDB(conn)
-	
+
 	// Test the connection with a simple query
 	var result int
 	err = conn.QueryRow(context.Background(), "SELECT 1").Scan(&result)
@@ -49,26 +49,31 @@ func main() {
 	// Set up router
 	r := mux.NewRouter()
 
-	// Pass the db connection to your dispatch routes
+	// --- Namespaced routers ---
+	adminRouter := r.PathPrefix("/admin").Subrouter()
+	driverRouter := r.PathPrefix("/driver").Subrouter()
 
-	// Admin.auth
-	Admin.RegisterAuthRoutes(r)
-	// Admin.dispatch
-	Admin.RegisterDispatchRoutes(r)
-	// Admin.vehicles
-	Admin.RegisterVehicleRoutes(r)
-	//Admin.trips
-	Admin.RegisterTripRoutes(r)
+	// Admin routes
+	Admin.RegisterAuthRoutes(adminRouter)
+	Admin.RegisterDispatchRoutes(adminRouter)
+	Admin.RegisterVehicleRoutes(adminRouter)
+	Admin.RegisterTripRoutes(adminRouter)
 
-	// Driver.auth
-	Driver.RegisterDriverRoutes(r)
-	// Driver.trip
-	Driver.RegisterTripRoutes(r)
+	// Driver routes
+	Driver.RegisterDriverRoutes(driverRouter)
+	Driver.RegisterTripRoutes(driverRouter)
+	Driver.RegisterDeliveryRoutes(driverRouter)
 
-	// Driver.delivery
-	Driver.RegisterDeliveryRoutes(r)
+	// Debug: Print registered routes
+	r.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
+		path, _ := route.GetPathTemplate()
+		methods, _ := route.GetMethods()
+		fmt.Printf("Route registered: %s %v\n", path, methods)
+		return nil
+	})
 
 	// Start server
 	fmt.Println("Server running on :8080")
 	log.Fatal(http.ListenAndServe(":8080", r))
 }
+
