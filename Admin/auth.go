@@ -49,8 +49,6 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	
-
 	query := `
 		INSERT INTO public.admin_users (first_name, last_name, email, password)
 		VALUES ($1, $2, $3, $4)

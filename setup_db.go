@@ -1,5 +1,5 @@
 
-package setup
+package main
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
-func setup() {
+func main() {
 	// Load environment variables from .env file
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, using system environment variables")
