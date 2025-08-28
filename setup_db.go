@@ -1,4 +1,3 @@
-
 package main
 
 import (
@@ -30,6 +29,12 @@ func main() {
 		log.Fatalf("Unable to connect to database: %v\n", err)
 	}
 	defer conn.Close(context.Background())
+
+	// Drop the admin_users table if it exists
+	_, err = conn.Exec(context.Background(), "DROP TABLE IF EXISTS public.admin_users")
+	if err != nil {
+		log.Fatalf("Unable to drop admin_users table: %v\n", err)
+	}
 
 	// Read the schema.sql file
 	sqlContent, err := ioutil.ReadFile("schema.sql")
