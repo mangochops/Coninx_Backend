@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	
 	"net/http"
+	"strconv"
 
 	"github.com/gorilla/mux"
 )
@@ -11,7 +12,7 @@ import (
 type Driver struct {
 	FirstName           string `json:"firstName"`
 	LastName            string `json:"lastName"`
-	VehicleRegistration string `json:"vehicleRegistration"`
+	PhoneNumber         int    `json:"phoneNumber"`
 	Password            string `json:"password"`
 }
 
@@ -37,15 +38,17 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var creds struct {
-		VehicleRegistration string `json:"vehicleRegistration"`
-		Password            string `json:"password"`
+		PhoneNumber int    `json:"phoneNumber"`
+		Password    string `json:"password"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
 		http.Error(w, "Invalid input", http.StatusBadRequest)
 		return
 	}
 	// TODO: Authenticate driver with database
-	w.Write([]byte("Driver " + creds.VehicleRegistration + " logged in!"))
+	w.Write([]byte("Driver " + strconv.Itoa(creds.PhoneNumber) + " logged in!"))
+	// Optionally, remove the following line if not needed
+	// w.Write([]byte("Driver " + string(creds.PhoneNumber) + " logged in!"))
 }
 
 // RegisterDriverRoutes registers the driver endpoints to the router
