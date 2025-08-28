@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/gorilla/mux"
+	"github.com/jackc/pgx/v5"
 )
 
 type Driver struct {
@@ -14,6 +15,13 @@ type Driver struct {
 	LastName            string `json:"lastName"`
 	PhoneNumber         int    `json:"phoneNumber"`
 	Password            string `json:"password"`
+}
+
+var db *pgx.Conn
+
+// InitDB sets the global DB connection
+func InitDB(conn *pgx.Conn) {
+	db = conn
 }
 
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
