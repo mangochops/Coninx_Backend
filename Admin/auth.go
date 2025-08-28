@@ -49,7 +49,7 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	username := reg.FirstName + " " + reg.LastName
+	
 
 	query := `
 		INSERT INTO public.admin_users (first_name, last_name, email, password)
