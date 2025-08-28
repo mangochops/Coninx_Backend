@@ -2,20 +2,21 @@ package Admin
 
 import (
 	"encoding/json"
-	
+
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/mangochops/coninx_backend/Driver"
 )
 
 type Dispatch struct {
 	ID        int       `json:"id"`
 	Recepient string    `json:"recepient"`
 	Location  string    `json:"location"`
-	Driver    string    `json:"driver"`
-	Quantity  int       `json:"quantity"`
+	Driver    Driver.Driver `json:"driver"`
+	Vehicle   Vehicle   `json:"vehicle"`
 	Invoice   int       `json:"invoice"`
 	Date      time.Time `json:"date"`
 }

@@ -39,6 +39,10 @@ func main() {
 	Admin.RegisterAuthRoutes(r)
 	// Admin.dispatch
 	Admin.RegisterDispatchRoutes(r)
+	// Admin.vehicles
+	Admin.RegisterVehicleRoutes(r)
+	//Admin.trips
+	Admin.RegisterTripRoutes(r)
 
 	// Driver.auth
 	Driver.RegisterDriverRoutes(r)
