@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS admin_users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+
 -- Deliveries table
 CREATE TABLE IF NOT EXISTS deliveries (
     id SERIAL PRIMARY KEY,

@@ -34,6 +34,9 @@ func main() {
 	defer conn.Close(context.Background())
 	fmt.Println("Connected to database")
 
+	// Pass the db connection to Admin package
+	Admin.InitDB(conn)
+	
 	// Test the connection with a simple query
 	var result int
 	err = conn.QueryRow(context.Background(), "SELECT 1").Scan(&result)
