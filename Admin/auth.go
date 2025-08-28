@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-
+	"log"
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5"
 )
@@ -29,20 +29,29 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var reg Register
-	if err := json.NewDecoder(r.Body).Decode(&reg); err != nil {
-		http.Error(w, "Invalid input", http.StatusBadRequest)
+	if db == nil {
+		http.Error(w, "Database not initialized", http.StatusInternalServerError)
+		log.Println("DB connection is nil")
 		return
 	}
 
-	// Insert into admin_users table
+	var reg Register
+	if err := json.NewDecoder(r.Body).Decode(&reg); err != nil {
+		http.Error(w, "Invalid input", http.StatusBadRequest)
+		log.Println("JSON decode error:", err)
+		return
+	}
+
+	username := reg.FirstName + " " + reg.LastName
+
+	// Use fully qualified table name for Neon
 	query := `
-		INSERT INTO admin_users (username, email, password, created_at)
+		INSERT INTO public.admin_users (username, email, password, created_at)
 		VALUES ($1, $2, $3, NOW())
 	`
-	username := reg.FirstName + " " + reg.LastName
 	_, err := db.Exec(context.Background(), query, username, reg.Email, reg.Password)
 	if err != nil {
+		log.Println("Database insert error:", err)
 		http.Error(w, "Database insert failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -50,6 +59,7 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte("User " + reg.Email + " registered successfully!"))
 }
+
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
