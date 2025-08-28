@@ -2,3 +2,19 @@ modules = ["go-1.21"]
 
 [nix]
 channel = "stable-25_05"
+
+[workflows]
+runButton = "Run"
+
+[[workflows.workflow]]
+name = "Run"
+author = 38871438
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "go run main.go"
+
+[[ports]]
+localPort = 8080
+externalPort = 80
