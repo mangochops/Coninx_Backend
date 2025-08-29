@@ -13,6 +13,7 @@ FROM debian:bullseye-slim
 
 WORKDIR /app
 COPY --from=builder /app/server .
+COPY schema.sql .
 
 # Render expects apps to listen on $PORT
 ENV PORT=10000
