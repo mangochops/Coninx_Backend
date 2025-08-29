@@ -16,7 +16,7 @@ import (
 
 func main() {
 	// Setup database
-	SetupDB() // Make sure this function is defined in either main.go or setup_db.go
+	// SetupDB() // Make sure this function is defined in either main.go or setup_db.go
 
 	// Load environment variables
 	if err := godotenv.Load(); err != nil {
