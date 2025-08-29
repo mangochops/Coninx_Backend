@@ -10,15 +10,14 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5"
 	"github.com/joho/godotenv"
-	"github.com/rs/cors"
 	"github.com/mangochops/coninx_backend/Admin"
 	"github.com/mangochops/coninx_backend/Driver"
 )
 
 func main() {
 	// Setup database
-	// SetupDB() // Make sure this function is defined in either main.go or setup_db.go
-
+	SetupDB() // Call the setup function
+	
 	// Load environment variables
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, using system environment variables")
@@ -29,29 +28,30 @@ func main() {
 		log.Fatal("DB_URL environment variable not set")
 	}
 
-	// Connect to PostgreSQL
-	conn, err := pgx.Connect(context.Background(), dbURL)
-	if err != nil {
-		log.Fatalf("Unable to connect to database: %v\n", err)
+	// Connect to PostgreSQL (Neon)
+conn, err := pgx.Connect(context.Background(), dbURL)
+if err != nil {
+	log.Fatalf("Unable to connect to database: %v\n", err)
+}
+fmt.Println("Connected to database")
+
+// Ensure connection is closed when main exits
+defer func() {
+	if err := conn.Close(context.Background()); err != nil {
+		log.Printf("Error closing database connection: %v\n", err)
 	}
-	fmt.Println("Connected to database")
+}()
 
-	// Ensure connection is closed when main exits
-	defer func() {
-		if err := conn.Close(context.Background()); err != nil {
-			log.Printf("Error closing database connection: %v\n", err)
-		}
-	}()
+// Set search path to public schema (Neon)
+_, err = conn.Exec(context.Background(), "SET search_path TO public")
+if err != nil {
+	log.Fatalf("Failed to set search path: %v\n", err)
+}
 
-	// Set search path to public schema
-	_, err = conn.Exec(context.Background(), "SET search_path TO public")
-	if err != nil {
-		log.Fatalf("Failed to set search path: %v\n", err)
-	}
+// Initialize DB connections for packages
+Admin.InitDB(conn)
+Driver.InitDB(conn) // Ensure Driver package has InitDB function
 
-	// Initialize DB connections for packages
-	Admin.InitDB(conn)
-	Driver.InitDB(conn) // Ensure Driver package has InitDB function
 
 	// Test the connection with a simple query
 	var result int
@@ -64,14 +64,6 @@ func main() {
 
 	// Set up router
 	r := mux.NewRouter()
-
-	// Enable CORS
-    r := cors.New(cors.Options{
-        AllowedOrigins:   []string{"https://conninx-dashboard.vercel.app"}, // frontend origin
-        AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-        AllowedHeaders:   []string{"*"},
-        AllowCredentials: true,
-    })
 
 	// --- Namespaced routers ---
 	adminRouter := r.PathPrefix("/admin").Subrouter()
@@ -99,7 +91,7 @@ func main() {
 		log.Println("Error walking routes:", err)
 	}
 
-	// Start server on the recommended port (5000)
-	fmt.Println("Server running on :5000")
-	log.Fatal(http.ListenAndServe("0.0.0.0:5000", r))
+	// Start server
+	fmt.Println("Server running on :8080")
+	log.Fatal(http.ListenAndServe(":8080", r))
 }

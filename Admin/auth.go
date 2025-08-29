@@ -49,14 +49,12 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	username := reg.FirstName + " " + reg.LastName
-
 	query := `
-		INSERT INTO public.admin_users (username, email, password, created_at)
-		VALUES ($1, $2, $3, NOW())
+		INSERT INTO public.admin_users (first_name, last_name, email, password)
+		VALUES ($1, $2, $3, $4)
 	`
 
-	_, err := db.Exec(context.Background(), query, username, reg.Email, reg.Password)
+	_, err := db.Exec(context.Background(), query, reg.FirstName, reg.LastName, reg.Email, reg.Password)
 	if err != nil {
 		log.Println("[Signup] Database insert error:", err)
 		http.Error(w, "Database insert failed: "+err.Error(), http.StatusInternalServerError)

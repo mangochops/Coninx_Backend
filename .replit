@@ -2,6 +2,7 @@ modules = ["go-1.21"]
 
 [nix]
 channel = "stable-25_05"
+packages = ["postgresql_17_jit"]
 
 [workflows]
 runButton = "Run"
@@ -14,6 +15,10 @@ mode = "sequential"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "go run main.go"
+
+[[ports]]
+localPort = 5000
+externalPort = 5000
 
 [[ports]]
 localPort = 8080
