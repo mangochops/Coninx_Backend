@@ -8,7 +8,7 @@ SET search_path TO public;
 -- --------------------------
 -- Admin Users Table
 -- --------------------------
-CREATE TABLE admin_users (
+CREATE TABLE IF NOT EXISTS admin_users (
     id SERIAL PRIMARY KEY,
     first_name VARCHAR(100),
     last_name VARCHAR(100),
