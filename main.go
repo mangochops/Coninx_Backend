@@ -16,9 +16,6 @@ import (
 )
 
 func main() {
-	// Setup database
-	// SetupDB() // Make sure this function is defined in either main.go or setup_db.go
-
 	// Load environment variables
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, using system environment variables")
@@ -36,7 +33,6 @@ func main() {
 	}
 	fmt.Println("Connected to database")
 
-	// Ensure connection is closed when main exits
 	defer func() {
 		if err := conn.Close(context.Background()); err != nil {
 			log.Printf("Error closing database connection: %v\n", err)
@@ -51,9 +47,9 @@ func main() {
 
 	// Initialize DB connections for packages
 	Admin.InitDB(conn)
-	Driver.InitDB(conn) // Ensure Driver package has InitDB function
+	Driver.InitDB(conn)
 
-	// Test the connection with a simple query
+	// Test the connection
 	var result int
 	err = conn.QueryRow(context.Background(), "SELECT 1").Scan(&result)
 	if err != nil {
@@ -63,33 +59,25 @@ func main() {
 	}
 
 	// Set up router
-	r := mux.NewRouter()
-
-	// Enable CORS
-    r := cors.New(cors.Options{
-        AllowedOrigins:   []string{"https://conninx-dashboard.vercel.app"}, // frontend origin
-        AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-        AllowedHeaders:   []string{"*"},
-        AllowCredentials: true,
-    })
+	router := mux.NewRouter()
 
 	// --- Namespaced routers ---
-	adminRouter := r.PathPrefix("/admin").Subrouter()
-	driverRouter := r.PathPrefix("/driver").Subrouter()
+	adminRouter := router.PathPrefix("/admin").Subrouter()
+	driverRouter := router.PathPrefix("/driver").Subrouter()
 
 	// --- Admin routes ---
-	Admin.RegisterAuthRoutes(adminRouter)      // /admin/register, /admin/login
-	Admin.RegisterDispatchRoutes(adminRouter)  // /admin/dispatches
-	Admin.RegisterVehicleRoutes(adminRouter)   // /admin/vehicles
-	Admin.RegisterTripRoutes(adminRouter)      // /admin/trips
+	Admin.RegisterAuthRoutes(adminRouter)
+	Admin.RegisterDispatchRoutes(adminRouter)
+	Admin.RegisterVehicleRoutes(adminRouter)
+	Admin.RegisterTripRoutes(adminRouter)
 
 	// --- Driver routes ---
-	Driver.RegisterDriverRoutes(driverRouter)      // /driver/drivers
-	Driver.RegisterTripRoutes(driverRouter)        // /driver/trips
-	Driver.RegisterDeliveryRoutes(driverRouter)    // /driver/deliveries
+	Driver.RegisterDriverRoutes(driverRouter)
+	Driver.RegisterTripRoutes(driverRouter)
+	Driver.RegisterDeliveryRoutes(driverRouter)
 
 	// Debug: Print all registered routes
-	err = r.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
+	err = router.Walk(func(route *mux.Route, r *mux.Router, ancestors []*mux.Route) error {
 		path, _ := route.GetPathTemplate()
 		methods, _ := route.GetMethods()
 		fmt.Printf("Route registered: %s %v\n", path, methods)
@@ -99,7 +87,15 @@ func main() {
 		log.Println("Error walking routes:", err)
 	}
 
-	// Start server on the recommended port (5000)
+	// Enable CORS
+	corsHandler := cors.New(cors.Options{
+		AllowedOrigins:   []string{"https://conninx-dashboard.vercel.app"}, // your frontend origin
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"*"},
+		AllowCredentials: true,
+	}).Handler(router)
+
+	// Start server
 	fmt.Println("Server running on :5000")
-	log.Fatal(http.ListenAndServe("0.0.0.0:5000", r))
+	log.Fatal(http.ListenAndServe("0.0.0.0:5000", corsHandler))
 }
