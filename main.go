@@ -10,6 +10,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5"
 	"github.com/joho/godotenv"
+	"github.com/rs/cors"
 	"github.com/mangochops/coninx_backend/Admin"
 	"github.com/mangochops/coninx_backend/Driver"
 )
@@ -61,6 +62,14 @@ Driver.InitDB(conn) // Ensure Driver package has InitDB function
 
 	// Set up router
 	r := mux.NewRouter()
+
+	// Enable CORS
+    r := cors.New(cors.Options{
+        AllowedOrigins:   []string{"https://conninx-dashboard.vercel.app"}, // frontend origin
+        AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+        AllowedHeaders:   []string{"*"},
+        AllowCredentials: true,
+    })
 
 	// --- Namespaced routers ---
 	adminRouter := r.PathPrefix("/admin").Subrouter()
