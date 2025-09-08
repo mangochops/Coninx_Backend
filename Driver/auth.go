@@ -63,8 +63,8 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 // RegisterDriverRoutes registers the driver endpoints to the router
 func RegisterDriverRoutes(r *mux.Router) {
-	r.HandleFunc("/driver/register", RegisterHandler).Methods("POST")
-	r.HandleFunc("/driver/login", LoginHandler).Methods("POST")
+	r.HandleFunc("/register", RegisterHandler).Methods("POST")
+	r.HandleFunc("/login", LoginHandler).Methods("POST")
 }
 
 
