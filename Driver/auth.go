@@ -2,7 +2,6 @@ package Driver
 
 import (
 	"encoding/json"
-	
 	"net/http"
 	"strconv"
 
@@ -11,12 +10,13 @@ import (
 )
 
 type Driver struct {
-	FirstName           string `json:"firstName"`
-	LastName            string `json:"lastName"`
-	PhoneNumber         int    `json:"phoneNumber"`
-	Password            string `json:"password"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+	IDNumber  int    `json:"idNumber"`
+	Password  string `json:"password"`
 }
 
+var drivers []Driver
 var db *pgx.Conn
 
 // InitDB sets the global DB connection
@@ -39,6 +39,10 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Driver " + d.FirstName + " registered successfully!"))
 }
 
+func GetDriver(w http.ResponseWriter, r *http.Request) {
+	json.NewEncoder(w).Encode(drivers)
+}
+
 // Optionally, add a login handler for drivers
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -55,8 +59,6 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	// TODO: Authenticate driver with database
 	w.Write([]byte("Driver " + strconv.Itoa(creds.PhoneNumber) + " logged in!"))
-	// Optionally, remove the following line if not needed
-	// w.Write([]byte("Driver " + string(creds.PhoneNumber) + " logged in!"))
 }
 
 // RegisterDriverRoutes registers the driver endpoints to the router
@@ -64,5 +66,6 @@ func RegisterDriverRoutes(r *mux.Router) {
 	r.HandleFunc("/driver/register", RegisterHandler).Methods("POST")
 	r.HandleFunc("/driver/login", LoginHandler).Methods("POST")
 }
+
 
 
