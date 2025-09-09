@@ -1,41 +1,68 @@
 package Admin
 
 import (
+	"context"
 	"encoding/json"
-	
 	"net/http"
 	"strconv"
 
 	"github.com/gorilla/mux"
 )
 
+// Vehicle struct
 type Vehicle struct {
-	ID        int       `json:"id"`
-	Type      string    `json:"type"`
-	RegNo     string    `json:"reg_no"`
-	Status    bool      `json:"status"`
+	ID     int    `json:"id"`
+	Type   string `json:"type"`
+	RegNo  string `json:"reg_no"`
+	Status bool   `json:"status"`
 }
 
-var vehicles []Vehicle
-
-
+// CreateVehicle inserts a new vehicle
 func CreateVehicle(w http.ResponseWriter, r *http.Request) {
 	var v Vehicle
 	if err := json.NewDecoder(r.Body).Decode(&v); err != nil {
 		http.Error(w, "Invalid input", http.StatusBadRequest)
 		return
 	}
-	v.ID = nextID
-	nextID++
-	vehicles = append(vehicles, v)
+
+	// Use db from auth.go
+	err := db.QueryRow(
+		context.Background(),
+		`INSERT INTO vehicles (type, reg_no, status) VALUES ($1, $2, $3) RETURNING id`,
+		v.Type, v.RegNo, v.Status,
+	).Scan(&v.ID)
+	if err != nil {
+		http.Error(w, "Failed to insert vehicle: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(v)
 }
 
+// GetVehicles returns all vehicles
 func GetVehicles(w http.ResponseWriter, r *http.Request) {
+	rows, err := db.Query(context.Background(), `SELECT id, type, reg_no, status FROM vehicles`)
+	if err != nil {
+		http.Error(w, "Failed to fetch vehicles: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var vehicles []Vehicle
+	for rows.Next() {
+		var v Vehicle
+		if err := rows.Scan(&v.ID, &v.Type, &v.RegNo, &v.Status); err != nil {
+			http.Error(w, "Error scanning vehicle: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		vehicles = append(vehicles, v)
+	}
+
 	json.NewEncoder(w).Encode(vehicles)
 }
 
+// GetVehicle returns a single vehicle by ID
 func GetVehicle(w http.ResponseWriter, r *http.Request) {
 	idStr := mux.Vars(r)["id"]
 	id, err := strconv.Atoi(idStr)
@@ -43,15 +70,27 @@ func GetVehicle(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
 		return
 	}
-	for _, v := range vehicles {
-		if v.ID == id {
-			json.NewEncoder(w).Encode(v)
-			return
+
+	var v Vehicle
+	err = db.QueryRow(context.Background(),
+		`SELECT id, type, reg_no, status FROM vehicles WHERE id = $1`,
+		id,
+	).Scan(&v.ID, &v.Type, &v.RegNo, &v.Status)
+
+	if err != nil {
+		// Handle "no rows" without pgx.ErrNoRows directly
+		if err.Error() == "no rows in result set" {
+			http.NotFound(w, r)
+		} else {
+			http.Error(w, "Failed to fetch vehicle: "+err.Error(), http.StatusInternalServerError)
 		}
+		return
 	}
-	http.NotFound(w, r)
+
+	json.NewEncoder(w).Encode(v)
 }
 
+// UpdateVehicle updates a vehicle by ID
 func UpdateVehicle(w http.ResponseWriter, r *http.Request) {
 	idStr := mux.Vars(r)["id"]
 	id, err := strconv.Atoi(idStr)
@@ -59,22 +98,27 @@ func UpdateVehicle(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
 		return
 	}
-	var updated Vehicle
-	if err := json.NewDecoder(r.Body).Decode(&updated); err != nil {
+
+	var v Vehicle
+	if err := json.NewDecoder(r.Body).Decode(&v); err != nil {
 		http.Error(w, "Invalid input", http.StatusBadRequest)
 		return
 	}
-	for i, v := range vehicles {
-		if v.ID == id {
-			updated.ID = id
-			vehicles[i] = updated
-			json.NewEncoder(w).Encode(updated)
-			return
-		}
+
+	_, err = db.Exec(context.Background(),
+		`UPDATE vehicles SET type=$1, reg_no=$2, status=$3 WHERE id=$4`,
+		v.Type, v.RegNo, v.Status, id,
+	)
+	if err != nil {
+		http.Error(w, "Failed to update vehicle: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
-	http.NotFound(w, r)
+
+	v.ID = id
+	json.NewEncoder(w).Encode(v)
 }
 
+// DeleteVehicle removes a vehicle by ID
 func DeleteVehicle(w http.ResponseWriter, r *http.Request) {
 	idStr := mux.Vars(r)["id"]
 	id, err := strconv.Atoi(idStr)
@@ -82,17 +126,17 @@ func DeleteVehicle(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
 		return
 	}
-	for i, v := range vehicles {
-		if v.ID == id {
-			vehicles = append(vehicles[:i], vehicles[i+1:]...)
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
+
+	_, err = db.Exec(context.Background(), `DELETE FROM vehicles WHERE id=$1`, id)
+	if err != nil {
+		http.Error(w, "Failed to delete vehicle: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
-	http.NotFound(w, r)
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
-// RegisterVehicleRoutes registers all vehicle endpoints to the router
+// RegisterVehicleRoutes registers vehicle endpoints
 func RegisterVehicleRoutes(r *mux.Router) {
 	r.HandleFunc("/vehicles", CreateVehicle).Methods("POST")
 	r.HandleFunc("/vehicles", GetVehicles).Methods("GET")
@@ -100,3 +144,4 @@ func RegisterVehicleRoutes(r *mux.Router) {
 	r.HandleFunc("/vehicles/{id}", UpdateVehicle).Methods("PUT")
 	r.HandleFunc("/vehicles/{id}", DeleteVehicle).Methods("DELETE")
 }
+

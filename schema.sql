@@ -31,13 +31,12 @@ CREATE TABLE IF NOT EXISTS drivers (
 -- --------------------------
 CREATE TABLE IF NOT EXISTS vehicles (
     id SERIAL PRIMARY KEY,
-    make VARCHAR(100),
-    model VARCHAR(100),
-    year INTEGER,
-    license_plate VARCHAR(50) UNIQUE,
-    driver_id INTEGER REFERENCES drivers(id) ON DELETE SET NULL,
+    type VARCHAR(100) NOT NULL,
+    reg_no VARCHAR(50) UNIQUE NOT NULL,
+    status BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
 
 -- --------------------------
 -- Dispatches Table

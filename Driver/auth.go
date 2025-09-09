@@ -36,7 +36,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	// TODO: Save driver to database
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte("Driver " + d.FirstName + " registered successfully!"))
+	w.Write([]byte("Driver " + d.FirstName + " " + d.LastName + " registered successfully!"))
 }
 
 func GetDriver(w http.ResponseWriter, r *http.Request) {
@@ -49,17 +49,21 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Only POST allowed", http.StatusMethodNotAllowed)
 		return
 	}
+
 	var creds struct {
-		PhoneNumber int    `json:"phoneNumber"`
-		Password    string `json:"password"`
+		IDNumber int    `json:"idNumber"`
+		Password string `json:"password"`
 	}
+
 	if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
 		http.Error(w, "Invalid input", http.StatusBadRequest)
 		return
 	}
+
 	// TODO: Authenticate driver with database
-	w.Write([]byte("Driver " + strconv.Itoa(creds.PhoneNumber) + " logged in!"))
+	w.Write([]byte("Driver " + strconv.Itoa(creds.IDNumber) + " logged in!"))
 }
+
 
 // RegisterDriverRoutes registers the driver endpoints to the router
 func RegisterDriverRoutes(r *mux.Router) {
