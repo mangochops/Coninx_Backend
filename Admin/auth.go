@@ -7,9 +7,10 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// --- Structs ---
 type Register struct {
 	FirstName string `json:"firstName"`
 	LastName  string `json:"lastName"`
@@ -22,23 +23,30 @@ type Login struct {
 	Password string `json:"password"`
 }
 
-var db *pgx.Conn
+// --- Global pool ---
+var dbPool *pgxpool.Pool
 
-// InitDB sets the global DB connection
-func InitDB(conn *pgx.Conn) {
-	db = conn
+// --- InitDBPool initializes the DB connection pool ---
+func InitDBPool(connString string) error {
+	pool, err := pgxpool.New(context.Background(), connString)
+	if err != nil {
+		return err
+	}
+	dbPool = pool
+	log.Println("[DB] Connection pool initialized")
+	return nil
 }
 
-// SignupHandler handles admin registration
+// --- SignupHandler ---
 func SignupHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Only POST allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	if db == nil {
+	if dbPool == nil {
 		http.Error(w, "Database not initialized", http.StatusInternalServerError)
-		log.Println("[Signup] DB connection is nil")
+		log.Println("[Signup] DB pool is nil")
 		return
 	}
 
@@ -54,7 +62,7 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 		VALUES ($1, $2, $3, $4)
 	`
 
-	_, err := db.Exec(context.Background(), query, reg.FirstName, reg.LastName, reg.Email, reg.Password)
+	_, err := dbPool.Exec(context.Background(), query, reg.FirstName, reg.LastName, reg.Email, reg.Password)
 	if err != nil {
 		log.Println("[Signup] Database insert error:", err)
 		http.Error(w, "Database insert failed: "+err.Error(), http.StatusInternalServerError)
@@ -66,16 +74,16 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("[Signup] User registered:", reg.Email)
 }
 
-// LoginHandler handles admin login
+// --- LoginHandler ---
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Only POST allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	if db == nil {
+	if dbPool == nil {
 		http.Error(w, "Database not initialized", http.StatusInternalServerError)
-		log.Println("[Login] DB connection is nil")
+		log.Println("[Login] DB pool is nil")
 		return
 	}
 
@@ -87,7 +95,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var storedPassword string
-	err := db.QueryRow(context.Background(),
+	err := dbPool.QueryRow(context.Background(),
 		"SELECT password FROM public.admin_users WHERE email=$1",
 		creds.Email).Scan(&storedPassword)
 
@@ -106,10 +114,11 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("[Login] User logged in:", creds.Email)
 }
 
-// RegisterAuthRoutes registers /admin/register and /admin/login
+// --- Register routes ---
 func RegisterAuthRoutes(r *mux.Router) {
 	r.HandleFunc("/register", SignupHandler).Methods("POST")
 	r.HandleFunc("/login", LoginHandler).Methods("POST")
 }
+
 
 
