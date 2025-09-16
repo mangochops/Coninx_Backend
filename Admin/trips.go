@@ -102,7 +102,7 @@ func CreateTrip(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := db.QueryRow(
+	err := dbPool.QueryRow(
 		context.Background(),
 		`INSERT INTO trips (dispatch_id, driver_id, vehicle_id, status, latitude, longitude)
 		 VALUES ($1,$2,$3,$4,$5,$6)
@@ -127,7 +127,7 @@ func CreateTrip(w http.ResponseWriter, r *http.Request) {
 
 // GetTrips now returns only ACTIVE trips
 func GetTrips(w http.ResponseWriter, r *http.Request) {
-	rows, err := db.Query(context.Background(),
+	rows, err := dbPool.Query(context.Background(),
 		`SELECT id, dispatch_id, driver_id, vehicle_id, status, latitude, longitude, last_updated 
 		 FROM trips WHERE status != 'completed'`)
 	if err != nil {
@@ -159,7 +159,7 @@ func GetTrip(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var t Trips
-	err = db.QueryRow(context.Background(),
+	err = dbPool.QueryRow(context.Background(),
 		`SELECT id, dispatch_id, driver_id, vehicle_id, status, latitude, longitude, last_updated
 		 FROM trips WHERE id=$1`, id,
 	).Scan(&t.ID, &t.DispatchID, &t.Driver.IDNumber, &t.Vehicle.ID,
@@ -187,7 +187,7 @@ func UpdateTrip(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = db.Exec(context.Background(),
+	_, err = dbPool.Exec(context.Background(),
 		`UPDATE trips SET status=$1, latitude=$2, longitude=$3, last_updated=NOW()
 		 WHERE id=$4`,
 		updated.Status, updated.Latitude, updated.Longitude, id,
@@ -211,7 +211,7 @@ func DeleteTrip(w http.ResponseWriter, r *http.Request) {
 	idStr := mux.Vars(r)["id"]
 	id, _ := strconv.Atoi(idStr)
 
-	_, err := db.Exec(context.Background(), `DELETE FROM trips WHERE id=$1`, id)
+	_, err := dbPool.Exec(context.Background(), `DELETE FROM trips WHERE id=$1`, id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -240,7 +240,7 @@ func UpdateTripLocation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err := db.Exec(context.Background(),
+	_, err := dbPool.Exec(context.Background(),
 		`UPDATE trips SET latitude=$1, longitude=$2, last_updated=NOW() WHERE id=$3`,
 		body.Latitude, body.Longitude, id,
 	)
@@ -250,7 +250,7 @@ func UpdateTripLocation(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var t Trips
-	err = db.QueryRow(context.Background(),
+	err = dbPool.QueryRow(context.Background(),
 		`SELECT id, dispatch_id, driver_id, vehicle_id, status, latitude, longitude, last_updated 
 		 FROM trips WHERE id=$1 AND status != 'completed'`, id,
 	).Scan(&t.ID, &t.DispatchID, &t.Driver.IDNumber, &t.Vehicle.ID,

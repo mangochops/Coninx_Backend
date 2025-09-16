@@ -26,7 +26,7 @@ func CreateVehicle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Use db from auth.go
-	err := db.QueryRow(
+	err := dbPool.QueryRow(
 		context.Background(),
 		`INSERT INTO vehicles (type, reg_no, status) VALUES ($1, $2, $3) RETURNING id`,
 		v.Type, v.RegNo, v.Status,
@@ -42,7 +42,7 @@ func CreateVehicle(w http.ResponseWriter, r *http.Request) {
 
 // GetVehicles returns all vehicles
 func GetVehicles(w http.ResponseWriter, r *http.Request) {
-	rows, err := db.Query(context.Background(), `SELECT id, type, reg_no, status FROM vehicles`)
+	rows, err := dbPool.Query(context.Background(), `SELECT id, type, reg_no, status FROM vehicles`)
 	if err != nil {
 		http.Error(w, "Failed to fetch vehicles: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -72,7 +72,7 @@ func GetVehicle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var v Vehicle
-	err = db.QueryRow(context.Background(),
+	err = dbPool.QueryRow(context.Background(),
 		`SELECT id, type, reg_no, status FROM vehicles WHERE id = $1`,
 		id,
 	).Scan(&v.ID, &v.Type, &v.RegNo, &v.Status)
@@ -105,7 +105,7 @@ func UpdateVehicle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = db.Exec(context.Background(),
+	_, err = dbPool.Exec(context.Background(),
 		`UPDATE vehicles SET type=$1, reg_no=$2, status=$3 WHERE id=$4`,
 		v.Type, v.RegNo, v.Status, id,
 	)
@@ -127,7 +127,7 @@ func DeleteVehicle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = db.Exec(context.Background(), `DELETE FROM vehicles WHERE id=$1`, id)
+	_, err = dbPool.Exec(context.Background(), `DELETE FROM vehicles WHERE id=$1`, id)
 	if err != nil {
 		http.Error(w, "Failed to delete vehicle: "+err.Error(), http.StatusInternalServerError)
 		return

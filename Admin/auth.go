@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // --- Structs ---
@@ -57,15 +60,41 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// ✅ Hash password before saving
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(reg.Password), bcrypt.DefaultCost)
+	if err != nil {
+		http.Error(w, "Error securing password", http.StatusInternalServerError)
+		log.Println("[Signup] Password hash error:", err)
+		return
+	}
+
 	query := `
 		INSERT INTO public.admin_users (first_name, last_name, email, password)
 		VALUES ($1, $2, $3, $4)
 	`
 
-	_, err := dbPool.Exec(context.Background(), query, reg.FirstName, reg.LastName, reg.Email, reg.Password)
+	// Use request-scoped context with timeout
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	_, err = dbPool.Exec(ctx, query, reg.FirstName, reg.LastName, reg.Email, string(hashedPassword))
 	if err != nil {
-		log.Println("[Signup] Database insert error:", err)
+		// Handle duplicate email separately
+		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == "23505" {
+			http.Error(w, "Email already registered", http.StatusConflict) // 409
+			log.Println("[Signup] Duplicate email:", reg.Email)
+			return
+		}
+
+		// Handle broken pipe / transient DB errors
+		if err.Error() == "broken pipe" {
+			http.Error(w, "Temporary database error, try again", http.StatusServiceUnavailable)
+			log.Println("[Signup] Broken pipe, database connection dropped")
+			return
+		}
+
 		http.Error(w, "Database insert failed: "+err.Error(), http.StatusInternalServerError)
+		log.Println("[Signup] Database insert error:", err)
 		return
 	}
 
@@ -94,10 +123,15 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var storedPassword string
-	err := dbPool.QueryRow(context.Background(),
+	var storedHashedPassword string
+
+	// Add context with timeout
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	err := dbPool.QueryRow(ctx,
 		"SELECT password FROM public.admin_users WHERE email=$1",
-		creds.Email).Scan(&storedPassword)
+		creds.Email).Scan(&storedHashedPassword)
 
 	if err != nil {
 		log.Println("[Login] Query error:", err)
@@ -105,7 +139,8 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if creds.Password != storedPassword {
+	// ✅ Compare hashed password
+	if bcrypt.CompareHashAndPassword([]byte(storedHashedPassword), []byte(creds.Password)) != nil {
 		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
 		return
 	}
@@ -119,6 +154,7 @@ func RegisterAuthRoutes(r *mux.Router) {
 	r.HandleFunc("/register", SignupHandler).Methods("POST")
 	r.HandleFunc("/login", LoginHandler).Methods("POST")
 }
+
 
 
 

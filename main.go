@@ -15,11 +15,14 @@ import (
 	"github.com/mangochops/coninx_backend/Driver"
 )
 
+
 func main() {
 	// Load environment variables
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, using system environment variables")
 	}
+
+	
 
 	dbURL := os.Getenv("DB_URL")
 	if dbURL == "" {
@@ -46,7 +49,7 @@ func main() {
 	}
 
 	// Initialize DB connections for packages
-	Admin.InitDB(conn)
+	// Admin.InitDB(conn)
 	Driver.InitDB(conn)
 
 	// Test the connection

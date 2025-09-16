@@ -75,7 +75,7 @@ func CreateDispatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := db.QueryRow(
+	err := dbPool.QueryRow(
 		context.Background(),
 		`INSERT INTO dispatches (recipient, phone, location, driver_id, vehicle_id, invoice, verified)
 		 VALUES ($1,$2,$3,$4,$5,$6,FALSE)
@@ -93,7 +93,7 @@ func CreateDispatch(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetDispatches(w http.ResponseWriter, r *http.Request) {
-	rows, err := db.Query(context.Background(),
+	rows, err := dbPool.Query(context.Background(),
 		`SELECT id, recipient, phone, location, invoice, date, verified FROM dispatches`)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -119,7 +119,7 @@ func GetDispatch(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.Atoi(idStr)
 
 	var d Dispatch
-	err := db.QueryRow(context.Background(),
+	err := dbPool.QueryRow(context.Background(),
 		`SELECT id, recipient, phone, location, invoice, date, verified FROM dispatches WHERE id=$1`, id,
 	).Scan(&d.ID, &d.Recepient, &d.Phone, &d.Location, &d.Invoice, &d.Date, &d.Verified)
 
@@ -141,7 +141,7 @@ func UpdateDispatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err := db.Exec(context.Background(),
+	_, err := dbPool.Exec(context.Background(),
 		`UPDATE dispatches SET recipient=$1, phone=$2, location=$3, invoice=$4 WHERE id=$5`,
 		updated.Recepient, updated.Phone, updated.Location, updated.Invoice, id,
 	)
@@ -158,7 +158,7 @@ func DeleteDispatch(w http.ResponseWriter, r *http.Request) {
 	idStr := mux.Vars(r)["id"]
 	id, _ := strconv.Atoi(idStr)
 
-	_, err := db.Exec(context.Background(), `DELETE FROM dispatches WHERE id=$1`, id)
+	_, err := dbPool.Exec(context.Background(), `DELETE FROM dispatches WHERE id=$1`, id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -173,7 +173,7 @@ func SendOTP(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.Atoi(idStr)
 
 	var phone string
-	err := db.QueryRow(context.Background(),
+	err := dbPool.QueryRow(context.Background(),
 		`SELECT phone FROM dispatches WHERE id=$1`, id).Scan(&phone)
 	if err != nil {
 		http.Error(w, "Dispatch not found", http.StatusNotFound)
@@ -208,7 +208,7 @@ func VerifyOTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var phone string
-	err := db.QueryRow(context.Background(),
+	err := dbPool.QueryRow(context.Background(),
 		`SELECT phone FROM dispatches WHERE id=$1`, id).Scan(&phone)
 	if err != nil {
 		http.Error(w, "Dispatch not found", http.StatusNotFound)
@@ -226,7 +226,7 @@ func VerifyOTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if *resp.Status == "approved" {
-		_, err := db.Exec(context.Background(),
+		_, err := dbPool.Exec(context.Background(),
 			`UPDATE dispatches SET verified=TRUE WHERE id=$1`, id)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
