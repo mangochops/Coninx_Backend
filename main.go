@@ -49,7 +49,7 @@ func main() {
 	}
 
 	// Initialize DB connections for packages
-	// Admin.InitDB(conn)
+	Admin.InitDBPool(dbURL)
 	Driver.InitDB(conn)
 
 	// Test the connection
