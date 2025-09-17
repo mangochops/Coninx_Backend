@@ -15,14 +15,11 @@ import (
 	"github.com/mangochops/coninx_backend/Driver"
 )
 
-
 func main() {
 	// Load environment variables
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, using system environment variables")
 	}
-
-	
 
 	dbURL := os.Getenv("DB_URL")
 	if dbURL == "" {
@@ -79,16 +76,10 @@ func main() {
 	Driver.RegisterTripRoutes(driverRouter)
 	Driver.RegisterDeliveryRoutes(driverRouter)
 
-	// Debug: Print all registered routes
-	err = router.Walk(func(route *mux.Route, r *mux.Router, ancestors []*mux.Route) error {
-		path, _ := route.GetPathTemplate()
-		methods, _ := route.GetMethods()
-		fmt.Printf("Route registered: %s %v\n", path, methods)
-		return nil
+	// Preflight handler for all OPTIONS requests
+	router.Methods(http.MethodOptions).HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
 	})
-	if err != nil {
-		log.Println("Error walking routes:", err)
-	}
 
 	// Enable CORS
 	corsHandler := cors.New(cors.Options{
@@ -96,9 +87,11 @@ func main() {
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"*"},
 		AllowCredentials: true,
+		Debug:            true, // helpful while testing
 	}).Handler(router)
 
 	// Start server
 	fmt.Println("Server running on :5000")
 	log.Fatal(http.ListenAndServe("0.0.0.0:5000", corsHandler))
+
 }
