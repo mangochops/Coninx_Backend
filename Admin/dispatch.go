@@ -19,7 +19,7 @@ import (
 
 type Dispatch struct {
 	ID        int           `json:"id"`
-	Recepient string        `json:"recepient"`
+	Recipient string        `json:"recipient"` // ✅ corrected
 	Phone     string        `json:"phone"`
 	Location  string        `json:"location"`
 	Driver    Driver.Driver `json:"driver"`
@@ -80,7 +80,7 @@ func CreateDispatch(w http.ResponseWriter, r *http.Request) {
 		`INSERT INTO dispatches (recipient, phone, location, driver_id, vehicle_id, invoice, verified)
 		 VALUES ($1,$2,$3,$4,$5,$6,FALSE)
 		 RETURNING id, date, verified`,
-		d.Recepient, d.Phone, d.Location, d.Driver.IDNumber, d.Vehicle.ID, d.Invoice,
+		d.Recipient, d.Phone, d.Location, d.Driver.IDNumber, d.Vehicle.ID, d.Invoice,
 	).Scan(&d.ID, &d.Date, &d.Verified)
 
 	if err != nil {
@@ -104,7 +104,7 @@ func GetDispatches(w http.ResponseWriter, r *http.Request) {
 	var dispatches []Dispatch
 	for rows.Next() {
 		var d Dispatch
-		if err := rows.Scan(&d.ID, &d.Recepient, &d.Phone, &d.Location, &d.Invoice, &d.Date, &d.Verified); err != nil {
+		if err := rows.Scan(&d.ID, &d.Recipient, &d.Phone, &d.Location, &d.Invoice, &d.Date, &d.Verified); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -121,7 +121,7 @@ func GetDispatch(w http.ResponseWriter, r *http.Request) {
 	var d Dispatch
 	err := dbPool.QueryRow(context.Background(),
 		`SELECT id, recipient, phone, location, invoice, date, verified FROM dispatches WHERE id=$1`, id,
-	).Scan(&d.ID, &d.Recepient, &d.Phone, &d.Location, &d.Invoice, &d.Date, &d.Verified)
+	).Scan(&d.ID, &d.Recipient, &d.Phone, &d.Location, &d.Invoice, &d.Date, &d.Verified)
 
 	if err != nil {
 		http.Error(w, "Dispatch not found", http.StatusNotFound)
@@ -143,7 +143,7 @@ func UpdateDispatch(w http.ResponseWriter, r *http.Request) {
 
 	_, err := dbPool.Exec(context.Background(),
 		`UPDATE dispatches SET recipient=$1, phone=$2, location=$3, invoice=$4 WHERE id=$5`,
-		updated.Recepient, updated.Phone, updated.Location, updated.Invoice, id,
+		updated.Recipient, updated.Phone, updated.Location, updated.Invoice, id,
 	)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
