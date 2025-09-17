@@ -9,7 +9,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -26,19 +25,19 @@ type Login struct {
 	Password string `json:"password"`
 }
 
-// --- Global pool ---
-var dbPool *pgxpool.Pool
+// // --- Global pool ---
+// var dbPool *pgxpool.Pool
 
-// --- InitDBPool initializes the DB connection pool ---
-func InitDBPool(connString string) error {
-	pool, err := pgxpool.New(context.Background(), connString)
-	if err != nil {
-		return err
-	}
-	dbPool = pool
-	log.Println("[DB] Connection pool initialized")
-	return nil
-}
+// // --- InitDBPool initializes the DB connection pool ---
+// func InitDBPool(connString string) error {
+// 	pool, err := pgxpool.New(context.Background(), connString)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	dbPool = pool
+// 	log.Println("[DB] Connection pool initialized")
+// 	return nil
+// }
 
 // --- SignupHandler ---
 func SignupHandler(w http.ResponseWriter, r *http.Request) {
