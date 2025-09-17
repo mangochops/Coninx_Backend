@@ -82,16 +82,20 @@ func main() {
 	})
 
 	// Enable CORS
-	corsHandler := cors.New(cors.Options{
-		AllowedOrigins:   []string{"https://conninx-dashboard.vercel.app"}, // your frontend origin
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"*"},
-		AllowCredentials: true,
-		Debug:            true, // helpful while testing
-	}).Handler(router)
+c := cors.New(cors.Options{
+    AllowedOrigins: []string{
+        "https://conninx-dashboard.vercel.app", // production
+        "http://localhost:3000",                // local dev
+    },
+    AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+    AllowedHeaders: []string{"Content-Type", "Authorization"},
+    AllowCredentials: true,
+    Debug: true, // shows preflight logs in terminal
+})
 
-	// Start server
-	fmt.Println("Server running on :5000")
-	log.Fatal(http.ListenAndServe("0.0.0.0:5000", corsHandler))
+// Start server
+fmt.Println("Server running on :5000")
+log.Fatal(http.ListenAndServe("0.0.0.0:5000", c.Handler(router)))
+
 
 }
