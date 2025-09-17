@@ -20,7 +20,7 @@ import (
 type Dispatch struct {
 	ID        int           `json:"id"`
 	Recipient string        `json:"recipient"` // ✅ corrected
-	Phone     string        `json:"phone"`
+	
 	Location  string        `json:"location"`
 	Driver    Driver.Driver `json:"driver"`
 	Vehicle   Vehicle       `json:"vehicle"`
@@ -77,10 +77,10 @@ func CreateDispatch(w http.ResponseWriter, r *http.Request) {
 
 	err := dbPool.QueryRow(
 		context.Background(),
-		`INSERT INTO dispatches (recipient, phone, location, driver_id, vehicle_id, invoice, verified)
+		`INSERT INTO dispatches (recipient,  location, driver_id, vehicle_id, invoice, verified)
 		 VALUES ($1,$2,$3,$4,$5,$6,FALSE)
 		 RETURNING id, date, verified`,
-		d.Recipient, d.Phone, d.Location, d.Driver.IDNumber, d.Vehicle.ID, d.Invoice,
+		d.Recipient,  d.Location, d.Driver.IDNumber, d.Vehicle.ID, d.Invoice,
 	).Scan(&d.ID, &d.Date, &d.Verified)
 
 	if err != nil {
@@ -94,7 +94,7 @@ func CreateDispatch(w http.ResponseWriter, r *http.Request) {
 
 func GetDispatches(w http.ResponseWriter, r *http.Request) {
 	rows, err := dbPool.Query(context.Background(),
-		`SELECT id, recipient, phone, location, invoice, date, verified FROM dispatches`)
+		`SELECT id, recipient,  location, invoice, date, verified FROM dispatches`)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -104,7 +104,7 @@ func GetDispatches(w http.ResponseWriter, r *http.Request) {
 	var dispatches []Dispatch
 	for rows.Next() {
 		var d Dispatch
-		if err := rows.Scan(&d.ID, &d.Recipient, &d.Phone, &d.Location, &d.Invoice, &d.Date, &d.Verified); err != nil {
+		if err := rows.Scan(&d.ID, &d.Recipient,  &d.Location, &d.Invoice, &d.Date, &d.Verified); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -120,8 +120,8 @@ func GetDispatch(w http.ResponseWriter, r *http.Request) {
 
 	var d Dispatch
 	err := dbPool.QueryRow(context.Background(),
-		`SELECT id, recipient, phone, location, invoice, date, verified FROM dispatches WHERE id=$1`, id,
-	).Scan(&d.ID, &d.Recipient, &d.Phone, &d.Location, &d.Invoice, &d.Date, &d.Verified)
+		`SELECT id, recipient,  location, invoice, date, verified FROM dispatches WHERE id=$1`, id,
+	).Scan(&d.ID, &d.Recipient,  &d.Location, &d.Invoice, &d.Date, &d.Verified)
 
 	if err != nil {
 		http.Error(w, "Dispatch not found", http.StatusNotFound)
@@ -142,8 +142,8 @@ func UpdateDispatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, err := dbPool.Exec(context.Background(),
-		`UPDATE dispatches SET recipient=$1, phone=$2, location=$3, invoice=$4 WHERE id=$5`,
-		updated.Recipient, updated.Phone, updated.Location, updated.Invoice, id,
+		`UPDATE dispatches SET recipient=$1, location=$2, invoice=$3 WHERE id=$4`,
+		updated.Recipient, updated.Location, updated.Invoice, id,
 	)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -195,51 +195,51 @@ func SendOTP(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func VerifyOTP(w http.ResponseWriter, r *http.Request) {
-	idStr := mux.Vars(r)["id"]
-	id, _ := strconv.Atoi(idStr)
+// func VerifyOTP(w http.ResponseWriter, r *http.Request) {
+// 	idStr := mux.Vars(r)["id"]
+// 	id, _ := strconv.Atoi(idStr)
 
-	var body struct {
-		Code string `json:"code"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "Invalid input", http.StatusBadRequest)
-		return
-	}
+// 	var body struct {
+// 		Code string `json:"code"`
+// 	}
+// 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+// 		http.Error(w, "Invalid input", http.StatusBadRequest)
+// 		return
+// 	}
 
-	var phone string
-	err := dbPool.QueryRow(context.Background(),
-		`SELECT phone FROM dispatches WHERE id=$1`, id).Scan(&phone)
-	if err != nil {
-		http.Error(w, "Dispatch not found", http.StatusNotFound)
-		return
-	}
+// 	var phone string
+// 	err := dbPool.QueryRow(context.Background(),
+// 		`SELECT phone FROM dispatches WHERE id=$1`, id).Scan(&phone)
+// 	if err != nil {
+// 		http.Error(w, "Dispatch not found", http.StatusNotFound)
+// 		return
+// 	}
 
-	params := &openapi.CreateVerificationCheckParams{}
-	params.SetTo(phone)
-	params.SetCode(body.Code)
+// 	params := &openapi.CreateVerificationCheckParams{}
+// 	params.SetTo(phone)
+// 	params.SetCode(body.Code)
 
-	resp, err := client.VerifyV2.CreateVerificationCheck(serviceSid, params)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+// 	resp, err := client.VerifyV2.CreateVerificationCheck(serviceSid, params)
+// 	if err != nil {
+// 		http.Error(w, err.Error(), http.StatusInternalServerError)
+// 		return
+// 	}
 
-	if *resp.Status == "approved" {
-		_, err := dbPool.Exec(context.Background(),
-			`UPDATE dispatches SET verified=TRUE WHERE id=$1`, id)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		json.NewEncoder(w).Encode(map[string]string{
-			"message": "OTP Verified, delivery confirmed ✅",
-		})
-		return
-	}
+// 	if *resp.Status == "approved" {
+// 		_, err := dbPool.Exec(context.Background(),
+// 			`UPDATE dispatches SET verified=TRUE WHERE id=$1`, id)
+// 		if err != nil {
+// 			http.Error(w, err.Error(), http.StatusInternalServerError)
+// 			return
+// 		}
+// 		json.NewEncoder(w).Encode(map[string]string{
+// 			"message": "OTP Verified, delivery confirmed ✅",
+// 		})
+// 		return
+// 	}
 
-	http.Error(w, "Invalid OTP", http.StatusUnauthorized)
-}
+// 	http.Error(w, "Invalid OTP", http.StatusUnauthorized)
+// }
 
 
 // RegisterDispatchRoutes registers the dispatch endpoints to the router
@@ -249,11 +249,11 @@ func RegisterDispatchRoutes(r *mux.Router) {
 	r.HandleFunc("/dispatches/{id}", GetDispatch).Methods("GET")
 	r.HandleFunc("/dispatches/{id}", UpdateDispatch).Methods("PUT")
 	r.HandleFunc("/dispatches/{id}", DeleteDispatch).Methods("DELETE")
-
-	// OTP routes
-	r.HandleFunc("/dispatches/{id}/send-otp", SendOTP).Methods("POST")
-	r.HandleFunc("/dispatches/{id}/verify-otp", VerifyOTP).Methods("POST")
 }
+	// OTP routes
+// 	r.HandleFunc("/dispatches/{id}/send-otp", SendOTP).Methods("POST")
+// 	r.HandleFunc("/dispatches/{id}/verify-otp", VerifyOTP).Methods("POST")
+// }
 	
 
 
