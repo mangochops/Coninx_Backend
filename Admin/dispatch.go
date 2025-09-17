@@ -77,9 +77,10 @@ func CreateDispatch(w http.ResponseWriter, r *http.Request) {
 
 	err := dbPool.QueryRow(
 		context.Background(),
-		`INSERT INTO dispatches (recipient,  location, driver_id, vehicle_id, invoice, verified)
-		 VALUES ($1,$2,$3,$4,$5,$6,FALSE)
-		 RETURNING id, date, verified`,
+		`INSERT INTO dispatches (recipient, location, driver_id, vehicle_id, invoice, verified)
+ 		VALUES ($1, $2, $3, $4, $5, FALSE)
+ 		RETURNING id, date, verified`,
+
 		d.Recipient,  d.Location, d.Driver.IDNumber, d.Vehicle.ID, d.Invoice,
 	).Scan(&d.ID, &d.Date, &d.Verified)
 
@@ -240,6 +241,8 @@ func SendOTP(w http.ResponseWriter, r *http.Request) {
 
 // 	http.Error(w, "Invalid OTP", http.StatusUnauthorized)
 // }
+
+
 
 
 // RegisterDispatchRoutes registers the dispatch endpoints to the router
