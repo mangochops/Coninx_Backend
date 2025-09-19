@@ -2,6 +2,7 @@ package Admin
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -66,8 +67,7 @@ func init() {
 	// InitDB()
 }
 
-// ---------------- CRUD ----------------
-
+// Create a dispatch
 func CreateDispatch(w http.ResponseWriter, r *http.Request) {
 	var d Dispatch
 	if err := json.NewDecoder(r.Body).Decode(&d); err != nil {
@@ -75,43 +75,58 @@ func CreateDispatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ✅ Look up vehicle_id by reg_no
-	var vehicleID int
+	// 🔑 Lookup driver_id by driver.id_number
+	var driverID int
 	err := dbPool.QueryRow(
+		context.Background(),
+		"SELECT id FROM drivers WHERE id_number=$1",
+		d.Driver.IDNumber,
+	).Scan(&driverID)
+	if err != nil {
+		http.Error(w, "Driver not found", http.StatusBadRequest)
+		return
+	}
+
+	// 🔑 Lookup vehicle_id by vehicle.reg_no
+	var vehicleID int
+	err = dbPool.QueryRow(
 		context.Background(),
 		"SELECT id FROM vehicles WHERE reg_no=$1",
 		d.Vehicle.RegNo,
 	).Scan(&vehicleID)
-
 	if err != nil {
 		http.Error(w, "Vehicle not found", http.StatusBadRequest)
 		return
 	}
 
-	// ✅ Insert dispatch
+	// Insert dispatch
 	err = dbPool.QueryRow(
 		context.Background(),
 		`INSERT INTO dispatches (recipient, location, driver_id, vehicle_id, invoice, verified)
          VALUES ($1, $2, $3, $4, $5, FALSE)
          RETURNING id, date, verified`,
-		d.Recipient, d.Location, d.Driver.IDNumber, vehicleID, d.Invoice,
+		d.Recipient, d.Location, driverID, vehicleID, d.Invoice,
 	).Scan(&d.ID, &d.Date, &d.Verified)
-
 	if err != nil {
 		http.Error(w, "Error inserting dispatch", http.StatusInternalServerError)
 		return
 	}
 
-	// ✅ Overwrite vehicle with reg_no for response
-	d.Vehicle.ID = vehicleID
-
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(d)
 }
 
+// Get all dispatches (with driver + vehicle info)
 func GetDispatches(w http.ResponseWriter, r *http.Request) {
-	rows, err := dbPool.Query(context.Background(),
-		`SELECT id, recipient,  location, invoice, date, verified FROM dispatches`)
+	rows, err := dbPool.Query(context.Background(), `
+		SELECT d.id, d.recipient, d.location, d.invoice, d.date, d.verified,
+		       dr.id_number, dr.first_name || ' ' || dr.last_name AS driver_name,
+		       v.reg_no
+		FROM dispatches d
+		LEFT JOIN drivers dr ON d.driver_id = dr.id
+		LEFT JOIN vehicles v ON d.vehicle_id = v.id
+		ORDER BY d.date DESC
+	`)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -121,33 +136,74 @@ func GetDispatches(w http.ResponseWriter, r *http.Request) {
 	var dispatches []Dispatch
 	for rows.Next() {
 		var d Dispatch
-		if err := rows.Scan(&d.ID, &d.Recipient, &d.Location, &d.Invoice, &d.Date, &d.Verified); err != nil {
+		var driverIDNumber sql.NullInt64
+		var driverName sql.NullString
+		var vehicleReg sql.NullString
+
+		if err := rows.Scan(&d.ID, &d.Recipient, &d.Location, &d.Invoice, &d.Date, &d.Verified,
+			&driverIDNumber, &driverName, &vehicleReg); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		if driverIDNumber.Valid {
+			d.Driver.IDNumber = int(driverIDNumber.Int64)
+		}
+		if driverName.Valid {
+			d.Driver.FirstName = driverName.String
+		}
+		if vehicleReg.Valid {
+			d.Vehicle.RegNo = vehicleReg.String
+		}
+
 		dispatches = append(dispatches, d)
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(dispatches)
 }
 
+// Get single dispatch by ID
 func GetDispatch(w http.ResponseWriter, r *http.Request) {
 	idStr := mux.Vars(r)["id"]
 	id, _ := strconv.Atoi(idStr)
 
 	var d Dispatch
-	err := dbPool.QueryRow(context.Background(),
-		`SELECT id, recipient,  location, invoice, date, verified FROM dispatches WHERE id=$1`, id,
-	).Scan(&d.ID, &d.Recipient, &d.Location, &d.Invoice, &d.Date, &d.Verified)
+	var driverIDNumber sql.NullInt64
+	var driverName sql.NullString
+	var vehicleReg sql.NullString
+
+	err := dbPool.QueryRow(context.Background(), `
+		SELECT d.id, d.recipient, d.location, d.invoice, d.date, d.verified,
+		       dr.id_number, dr.first_name || ' ' || dr.last_name AS driver_name,
+		       v.reg_no
+		FROM dispatches d
+		LEFT JOIN drivers dr ON d.driver_id = dr.id
+		LEFT JOIN vehicles v ON d.vehicle_id = v.id
+		WHERE d.id=$1
+	`, id).Scan(&d.ID, &d.Recipient, &d.Location, &d.Invoice, &d.Date, &d.Verified,
+		&driverIDNumber, &driverName, &vehicleReg)
 
 	if err != nil {
 		http.Error(w, "Dispatch not found", http.StatusNotFound)
 		return
 	}
 
+	if driverIDNumber.Valid {
+		d.Driver.IDNumber = int(driverIDNumber.Int64)
+	}
+	if driverName.Valid {
+		d.Driver.FirstName = driverName.String
+	}
+	if vehicleReg.Valid {
+		d.Vehicle.RegNo = vehicleReg.String
+	}
+
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(d)
 }
 
+// Update dispatch (recipient, location, invoice, driver, vehicle)
 func UpdateDispatch(w http.ResponseWriter, r *http.Request) {
 	idStr := mux.Vars(r)["id"]
 	id, _ := strconv.Atoi(idStr)
@@ -158,9 +214,32 @@ func UpdateDispatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err := dbPool.Exec(context.Background(),
-		`UPDATE dispatches SET recipient=$1, location=$2, invoice=$3 WHERE id=$4`,
-		updated.Recipient, updated.Location, updated.Invoice, id,
+	// Lookup driver ID
+	var driverID int
+	err := dbPool.QueryRow(context.Background(),
+		"SELECT id FROM drivers WHERE id_number=$1", updated.Driver.IDNumber,
+	).Scan(&driverID)
+	if err != nil {
+		http.Error(w, "Driver not found", http.StatusBadRequest)
+		return
+	}
+
+	// Lookup vehicle ID
+	var vehicleID int
+	err = dbPool.QueryRow(context.Background(),
+		"SELECT id FROM vehicles WHERE reg_no=$1", updated.Vehicle.RegNo,
+	).Scan(&vehicleID)
+	if err != nil {
+		http.Error(w, "Vehicle not found", http.StatusBadRequest)
+		return
+	}
+
+	// Update dispatch
+	_, err = dbPool.Exec(context.Background(),
+		`UPDATE dispatches 
+         SET recipient=$1, location=$2, invoice=$3, driver_id=$4, vehicle_id=$5
+         WHERE id=$6`,
+		updated.Recipient, updated.Location, updated.Invoice, driverID, vehicleID, id,
 	)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -168,9 +247,11 @@ func UpdateDispatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	updated.ID = id
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(updated)
 }
 
+// Delete dispatch
 func DeleteDispatch(w http.ResponseWriter, r *http.Request) {
 	idStr := mux.Vars(r)["id"]
 	id, _ := strconv.Atoi(idStr)
