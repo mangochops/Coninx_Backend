@@ -34,7 +34,19 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid input", http.StatusBadRequest)
 		return
 	}
-	// TODO: Save driver to database
+	// Save driver to database
+	if db == nil {
+		http.Error(w, "Database not initialized", http.StatusInternalServerError)
+		return
+	}
+	_, err := db.Exec(r.Context(),
+		"INSERT INTO drivers (first_name, last_name, id_number, password) VALUES ($1, $2, $3, $4)",
+		d.FirstName, d.LastName, d.IDNumber, d.Password,
+	)
+	if err != nil {
+		http.Error(w, "Failed to register driver: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte("Driver " + d.FirstName + " " + d.LastName + " registered successfully!"))
 }
@@ -64,12 +76,8 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Driver " + strconv.Itoa(creds.IDNumber) + " logged in!"))
 }
 
-
 // RegisterDriverRoutes registers the driver endpoints to the router
 func RegisterDriverRoutes(r *mux.Router) {
 	r.HandleFunc("/register", RegisterHandler).Methods("POST")
 	r.HandleFunc("/login", LoginHandler).Methods("POST")
 }
-
-
-
