@@ -12,21 +12,21 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	"github.com/mangochops/coninx_backend/Driver"
-	
+
 	"github.com/twilio/twilio-go"
 	openapi "github.com/twilio/twilio-go/rest/verify/v2"
 )
 
 type Dispatch struct {
-	ID        int           `json:"id"`
-	Recipient string        `json:"recipient"` // ✅ corrected
-	
-	Location  string        `json:"location"`
-	Driver    Driver.Driver `json:"driver"`
-	Vehicle   Vehicle       `json:"vehicle"`
-	Invoice   int           `json:"invoice"`
-	Date      time.Time     `json:"date"`
-	Verified  bool          `json:"verified"`
+	ID        int    `json:"id"`
+	Recipient string `json:"recipient"` // ✅ corrected
+
+	Location string        `json:"location"`
+	Driver   Driver.Driver `json:"driver"`
+	Vehicle  Vehicle       `json:"vehicle"`
+	Invoice  int           `json:"invoice"`
+	Date     time.Time     `json:"date"`
+	Verified bool          `json:"verified"`
 }
 
 // var db *pgxpool.Pool
@@ -75,21 +75,37 @@ func CreateDispatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// ✅ Look up vehicle_id by reg_no
+	var vehicleID int
 	err := dbPool.QueryRow(
 		context.Background(),
-		`INSERT INTO dispatches (recipient, location, driver_id, vehicle_id, invoice, verified)
- 		VALUES ($1, $2, $3, $4, $5, FALSE)
- 		RETURNING id, date, verified`,
-
-		d.Recipient,  d.Location, d.Driver.IDNumber, d.Vehicle.ID, d.Invoice,
-	).Scan(&d.ID, &d.Date, &d.Verified)
+		"SELECT id FROM vehicles WHERE reg_no=$1",
+		d.Vehicle.RegNo,
+	).Scan(&vehicleID)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Vehicle not found", http.StatusBadRequest)
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
+	// ✅ Insert dispatch
+	err = dbPool.QueryRow(
+		context.Background(),
+		`INSERT INTO dispatches (recipient, location, driver_id, vehicle_id, invoice, verified)
+         VALUES ($1, $2, $3, $4, $5, FALSE)
+         RETURNING id, date, verified`,
+		d.Recipient, d.Location, d.Driver.IDNumber, vehicleID, d.Invoice,
+	).Scan(&d.ID, &d.Date, &d.Verified)
+
+	if err != nil {
+		http.Error(w, "Error inserting dispatch", http.StatusInternalServerError)
+		return
+	}
+
+	// ✅ Overwrite vehicle with reg_no for response
+	d.Vehicle.ID = vehicleID
+
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(d)
 }
 
@@ -105,7 +121,7 @@ func GetDispatches(w http.ResponseWriter, r *http.Request) {
 	var dispatches []Dispatch
 	for rows.Next() {
 		var d Dispatch
-		if err := rows.Scan(&d.ID, &d.Recipient,  &d.Location, &d.Invoice, &d.Date, &d.Verified); err != nil {
+		if err := rows.Scan(&d.ID, &d.Recipient, &d.Location, &d.Invoice, &d.Date, &d.Verified); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -122,7 +138,7 @@ func GetDispatch(w http.ResponseWriter, r *http.Request) {
 	var d Dispatch
 	err := dbPool.QueryRow(context.Background(),
 		`SELECT id, recipient,  location, invoice, date, verified FROM dispatches WHERE id=$1`, id,
-	).Scan(&d.ID, &d.Recipient,  &d.Location, &d.Invoice, &d.Date, &d.Verified)
+	).Scan(&d.ID, &d.Recipient, &d.Location, &d.Invoice, &d.Date, &d.Verified)
 
 	if err != nil {
 		http.Error(w, "Dispatch not found", http.StatusNotFound)
@@ -242,9 +258,6 @@ func SendOTP(w http.ResponseWriter, r *http.Request) {
 // 	http.Error(w, "Invalid OTP", http.StatusUnauthorized)
 // }
 
-
-
-
 // RegisterDispatchRoutes registers the dispatch endpoints to the router
 func RegisterDispatchRoutes(r *mux.Router) {
 	r.HandleFunc("/dispatches", CreateDispatch).Methods("POST")
@@ -253,10 +266,8 @@ func RegisterDispatchRoutes(r *mux.Router) {
 	r.HandleFunc("/dispatches/{id}", UpdateDispatch).Methods("PUT")
 	r.HandleFunc("/dispatches/{id}", DeleteDispatch).Methods("DELETE")
 }
-	// OTP routes
+
+// OTP routes
 // 	r.HandleFunc("/dispatches/{id}/send-otp", SendOTP).Methods("POST")
 // 	r.HandleFunc("/dispatches/{id}/verify-otp", VerifyOTP).Methods("POST")
 // }
-	
-
-
