@@ -113,7 +113,7 @@ func CreateDispatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 🔑 Auto-create a trip for this dispatch
-	trip, err := AutoCreateTrip(d.ID, driverID, vehicleID, d.Location)
+	trip, err := AutoCreateTrip(d.ID, driverID, vehicleID, d.Location, d.Recipient)
 	if err != nil {
 		http.Error(w, "Dispatch created but trip creation failed: "+err.Error(), http.StatusInternalServerError)
 		return

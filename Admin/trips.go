@@ -16,16 +16,17 @@ import (
 
 // Trips represents a delivery trip persisted in DB
 type Trips struct {
-	ID          int           `json:"id"`
-	DispatchID  int           `json:"dispatch_id"`
-	Dispatch    *Dispatch     `json:"dispatch,omitempty"`
-	Driver      Driver.Driver `json:"driver"`
-	Vehicle     Vehicle       `json:"vehicle"`
-	Destination string        `json:"destination"`
-	Status      string        `json:"status"`
-	Latitude    float64       `json:"latitude"`
-	Longitude   float64       `json:"longitude"`
-	LastUpdated time.Time     `json:"lastUpdated"`
+	ID            int           `json:"id"`
+	DispatchID    int           `json:"dispatch_id"`
+	Dispatch      *Dispatch     `json:"dispatch,omitempty"`
+	Driver        Driver.Driver `json:"driver"`
+	Vehicle       Vehicle       `json:"vehicle"`
+	Destination   string        `json:"destination"`
+	RecipientName string        `json:"recipient_name"`
+	Status        string        `json:"status"`
+	Latitude      float64       `json:"latitude"`
+	Longitude     float64       `json:"longitude"`
+	LastUpdated   time.Time     `json:"lastUpdated"`
 }
 
 // ---------------- SSE broadcaster ----------------
@@ -97,20 +98,21 @@ func sseHandler(w http.ResponseWriter, r *http.Request) {
 // ---------------- CRUD ----------------
 
 // AutoCreateTrip is called by CreateDispatch to attach a trip automatically
-func AutoCreateTrip(dispatchID int, driverID int, vehicleID int, destination string) (*Trips, error) {
+func AutoCreateTrip(dispatchID int, driverID int, vehicleID int, destination string, recipientName string) (*Trips, error) {
 	var t Trips
 	err := dbPool.QueryRow(
 		context.Background(),
-		`INSERT INTO trips (dispatch_id, driver_id, vehicle_id, destination, status, latitude, longitude, last_updated)
-		 VALUES ($1, $2, $3, $4, 'started', 0, 0, NOW())
-		 RETURNING id, dispatch_id, driver_id, vehicle_id, destination, status, latitude, longitude, last_updated`,
-		dispatchID, driverID, vehicleID, destination,
+		`INSERT INTO trips (dispatch_id, driver_id, vehicle_id, destination, recipient_name, status, latitude, longitude, last_updated)
+		 VALUES ($1, $2, $3, $4, $5, 'started', 0, 0, NOW())
+		 RETURNING id, dispatch_id, driver_id, vehicle_id, destination, recipient_name, status, latitude, longitude, last_updated`,
+		dispatchID, driverID, vehicleID, destination, recipientName,
 	).Scan(
 		&t.ID,
 		&t.DispatchID,
-		&t.Driver.IDNumber, // use IDNumber as per Driver.Driver struct
-		&t.Vehicle.ID,      // assuming Trips struct nests Vehicle
+		&t.Driver.IDNumber,
+		&t.Vehicle.ID,
 		&t.Destination,
+		&t.RecipientName,
 		&t.Status,
 		&t.Latitude,
 		&t.Longitude,
