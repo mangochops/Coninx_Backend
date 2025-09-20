@@ -307,62 +307,95 @@ func SendOTP(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// func VerifyOTP(w http.ResponseWriter, r *http.Request) {
-// 	idStr := mux.Vars(r)["id"]
-// 	id, _ := strconv.Atoi(idStr)
+func VerifyOTP(w http.ResponseWriter, r *http.Request) {
+	idStr := mux.Vars(r)["id"]
+	dispatchID, _ := strconv.Atoi(idStr)
 
-// 	var body struct {
-// 		Code string `json:"code"`
-// 	}
-// 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-// 		http.Error(w, "Invalid input", http.StatusBadRequest)
-// 		return
-// 	}
+	var body struct {
+		Code string `json:"code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "Invalid input", http.StatusBadRequest)
+		return
+	}
 
-// 	var phone string
-// 	err := dbPool.QueryRow(context.Background(),
-// 		`SELECT phone FROM dispatches WHERE id=$1`, id).Scan(&phone)
-// 	if err != nil {
-// 		http.Error(w, "Dispatch not found", http.StatusNotFound)
-// 		return
-// 	}
+	// Get phone number
+	var phone string
+	err := dbPool.QueryRow(context.Background(),
+		`SELECT phone FROM dispatches WHERE id=$1`, dispatchID).Scan(&phone)
+	if err != nil {
+		http.Error(w, "Dispatch not found", http.StatusNotFound)
+		return
+	}
 
-// 	params := &openapi.CreateVerificationCheckParams{}
-// 	params.SetTo(phone)
-// 	params.SetCode(body.Code)
+	// Verify OTP with Twilio
+	params := &openapi.CreateVerificationCheckParams{}
+	params.SetTo(phone)
+	params.SetCode(body.Code)
 
-// 	resp, err := client.VerifyV2.CreateVerificationCheck(serviceSid, params)
-// 	if err != nil {
-// 		http.Error(w, err.Error(), http.StatusInternalServerError)
-// 		return
-// 	}
+	resp, err := client.VerifyV2.CreateVerificationCheck(serviceSid, params)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
-// 	if *resp.Status == "approved" {
-// 		_, err := dbPool.Exec(context.Background(),
-// 			`UPDATE dispatches SET verified=TRUE WHERE id=$1`, id)
-// 		if err != nil {
-// 			http.Error(w, err.Error(), http.StatusInternalServerError)
-// 			return
-// 		}
-// 		json.NewEncoder(w).Encode(map[string]string{
-// 			"message": "OTP Verified, delivery confirmed ✅",
-// 		})
-// 		return
-// 	}
+	if *resp.Status != "approved" {
+		http.Error(w, "Invalid OTP", http.StatusUnauthorized)
+		return
+	}
 
-// 	http.Error(w, "Invalid OTP", http.StatusUnauthorized)
-// }
+	// ✅ Update dispatch as verified
+	_, err = dbPool.Exec(context.Background(),
+		`UPDATE dispatches SET verified=TRUE WHERE id=$1`, dispatchID)
+	if err != nil {
+		http.Error(w, "Failed to update dispatch: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
 
-// RegisterDispatchRoutes registers the dispatch endpoints to the router
+	// ✅ Mark trip as completed
+	var tripID int
+	err = dbPool.QueryRow(context.Background(),
+		`UPDATE trips SET status='completed', last_updated=NOW()
+		 WHERE dispatch_id=$1 RETURNING id`, dispatchID).Scan(&tripID)
+	if err != nil {
+		http.Error(w, "Failed to update trip: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// ✅ Auto-create delivery record
+	var deliveryID int
+	var deliveryDate time.Time
+	err = dbPool.QueryRow(context.Background(),
+		`INSERT INTO deliveries (dispatch_id, trip_id, date)
+		 VALUES ($1, $2, NOW())
+		 RETURNING id, date`,
+		dispatchID, tripID,
+	).Scan(&deliveryID, &deliveryDate)
+	if err != nil {
+		http.Error(w, "Failed to create delivery: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// ✅ Final response
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message":  "OTP Verified ✅ Delivery completed",
+		"dispatch": dispatchID,
+		"trip":     tripID,
+		"delivery": map[string]interface{}{
+			"id":   deliveryID,
+			"date": deliveryDate,
+		},
+	})
+}
+
 func RegisterDispatchRoutes(r *mux.Router) {
 	r.HandleFunc("/dispatches", CreateDispatch).Methods("POST")
 	r.HandleFunc("/dispatches", GetDispatches).Methods("GET")
 	r.HandleFunc("/dispatches/{id}", GetDispatch).Methods("GET")
 	r.HandleFunc("/dispatches/{id}", UpdateDispatch).Methods("PUT")
 	r.HandleFunc("/dispatches/{id}", DeleteDispatch).Methods("DELETE")
-}
 
-// OTP routes
-// 	r.HandleFunc("/dispatches/{id}/send-otp", SendOTP).Methods("POST")
-// 	r.HandleFunc("/dispatches/{id}/verify-otp", VerifyOTP).Methods("POST")
-// }
+	// OTP routes
+	r.HandleFunc("/dispatches/{id}/send-otp", SendOTP).Methods("POST")
+	r.HandleFunc("/dispatches/{id}/verify-otp", VerifyOTP).Methods("POST")
+}

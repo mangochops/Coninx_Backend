@@ -1,117 +1,115 @@
 package Driver
 
 import (
+	"context"
 	"encoding/json"
-	"fmt"
-	"io"
 	"net/http"
-	"os"
-	"path/filepath"
-	"strconv"
-	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
 )
 
+// Delivery represents proof of completed dispatch by driver
 type Delivery struct {
-	ID           int       `json:"id"`
-	DeliveryNote string    `json:"deliveryNote"` // file path to the uploaded image
-	Recipient    string    `json:"recipient"`
-	Condition    string    `json:"condition"`
-	Date         time.Time `json:"date"`
+	ID         int       `json:"id"`
+	DispatchID int       `json:"dispatchId"`
+	TripID     int       `json:"tripId"`
+	Date       time.Time `json:"date"`
 }
 
-var (
-	deliveries   = make(map[int]Delivery)
-	// nextID is defined in trip.go and shared across the package
-	deliveriesMu sync.Mutex
-)
+// ---------------- CRUD ----------------
 
-// Handle delivery creation with image upload
+// CreateDeliveryHandler inserts a new delivery record
 func CreateDeliveryHandler(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseMultipartForm(10 << 20); err != nil { // 10MB max
-		http.Error(w, "Could not parse multipart form", http.StatusBadRequest)
+	var d Delivery
+	if err := json.NewDecoder(r.Body).Decode(&d); err != nil {
+		http.Error(w, "Invalid input", http.StatusBadRequest)
 		return
 	}
 
-	file, handler, err := r.FormFile("deliveryNote")
+	err := db.QueryRow(
+		context.Background(),
+		`INSERT INTO deliveries (dispatch_id, trip_id, date)
+		 VALUES ($1, $2, NOW())
+		 RETURNING id, date`,
+		d.DispatchID, d.TripID,
+	).Scan(&d.ID, &d.Date)
 	if err != nil {
-		http.Error(w, "Could not get deliveryNote file", http.StatusBadRequest)
+		http.Error(w, "Failed to insert delivery: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer file.Close()
-
-	// Save the uploaded file
-	uploadDir := "./uploads"
-	os.MkdirAll(uploadDir, os.ModePerm)
-	filePath := filepath.Join(uploadDir, strconv.Itoa(nextID)+"_"+handler.Filename)
-	dst, err := os.Create(filePath)
-	if err != nil {
-		http.Error(w, "Could not save file", http.StatusInternalServerError)
-		return
-	}
-	defer dst.Close()
-	if _, err := io.Copy(dst, file); err != nil {
-		http.Error(w, "Could not write file", http.StatusInternalServerError)
-		return
-	}
-
-	recipient := r.FormValue("recipient")
-	condition := r.FormValue("condition")
-
-	deliveriesMu.Lock()
-	d := Delivery{
-		ID:           nextID,
-		DeliveryNote: filePath,
-		Recipient:    recipient,
-		Condition:    condition,
-		Date:         time.Now(),
-	}
-	deliveries[nextID] = d
-	nextID++
-	deliveriesMu.Unlock()
 
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(d)
 }
 
-// Get a delivery by ID
-func GetDeliveryHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := mux.Vars(r)["id"]
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		http.Error(w, "Invalid delivery ID", http.StatusBadRequest)
-		return
-	}
-	deliveriesMu.Lock()
-	d, ok := deliveries[id]
-	deliveriesMu.Unlock()
-	if !ok {
-		http.NotFound(w, r)
-		return
-	}
-	json.NewEncoder(w).Encode(d)
-}
-
-// List all deliveries
+// ListDeliveriesHandler returns all deliveries
 func ListDeliveriesHandler(w http.ResponseWriter, r *http.Request) {
-	deliveriesMu.Lock()
-	defer deliveriesMu.Unlock()
+	rows, err := db.Query(
+		context.Background(),
+		`SELECT id, dispatch_id, trip_id, date
+		 FROM deliveries
+		 ORDER BY date DESC`,
+	)
+	if err != nil {
+		http.Error(w, "Failed to fetch deliveries: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
 	var list []Delivery
-	for _, d := range deliveries {
+	for rows.Next() {
+		var d Delivery
+		if err := rows.Scan(&d.ID, &d.DispatchID, &d.TripID, &d.Date); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		list = append(list, d)
 	}
+
 	json.NewEncoder(w).Encode(list)
 }
 
-// RegisterDeliveryRoutes registers all delivery endpoints to the router
-func RegisterDeliveryRoutes(r *mux.Router) {
-	r.HandleFunc("/delivery", CreateDeliveryHandler).Methods("POST")
-	r.HandleFunc("/delivery/{id}", GetDeliveryHandler).Methods("GET")
-	r.HandleFunc("/deliveries", ListDeliveriesHandler).Methods("GET")
+// GetDeliveryHandler returns a single delivery by ID
+func GetDeliveryHandler(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+
+	var d Delivery
+	err := db.QueryRow(
+		context.Background(),
+		`SELECT id, dispatch_id, trip_id, date
+		 FROM deliveries WHERE id=$1`,
+		id,
+	).Scan(&d.ID, &d.DispatchID, &d.TripID, &d.Date)
+	if err != nil {
+		http.Error(w, "Delivery not found", http.StatusNotFound)
+		return
+	}
+
+	json.NewEncoder(w).Encode(d)
 }
 
-func DeliverGoods() {
-	fmt.Println("Goods delivered successfully")
+// DeleteDeliveryHandler deletes a delivery by ID
+func DeleteDeliveryHandler(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+
+	_, err := db.Exec(context.Background(),
+		`DELETE FROM deliveries WHERE id=$1`, id,
+	)
+	if err != nil {
+		http.Error(w, "Failed to delete delivery: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ---------------- ROUTES ----------------
+
+// RegisterDeliveryRoutes adds delivery endpoints to router
+func RegisterDeliveryRoutes(r *mux.Router) {
+	r.HandleFunc("/driver/deliveries", CreateDeliveryHandler).Methods("POST")
+	r.HandleFunc("/driver/deliveries", ListDeliveriesHandler).Methods("GET")
+	r.HandleFunc("/driver/deliveries/{id}", GetDeliveryHandler).Methods("GET")
+	r.HandleFunc("/driver/deliveries/{id}", DeleteDeliveryHandler).Methods("DELETE")
 }
