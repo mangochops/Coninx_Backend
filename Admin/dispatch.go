@@ -102,8 +102,8 @@ func CreateDispatch(w http.ResponseWriter, r *http.Request) {
 	// Insert dispatch
 	err = dbPool.QueryRow(
 		context.Background(),
-		`INSERT INTO dispatches (recipient, location, driver_id, vehicle_id, invoice, verified)
-         VALUES ($1, $2, $3, $4, $5, FALSE)
+		`INSERT INTO dispatches (recipient, location, driver_id, vehicle_id, invoice, verified, date)
+         VALUES ($1, $2, $3, $4, $5, FALSE, NOW())
          RETURNING id, date, verified`,
 		d.Recipient, d.Location, driverID, vehicleID, d.Invoice,
 	).Scan(&d.ID, &d.Date, &d.Verified)
@@ -112,8 +112,22 @@ func CreateDispatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 🔑 Auto-create a trip for this dispatch
+	trip, err := AutoCreateTrip(d.ID, driverID, vehicleID)
+	if err != nil {
+		http.Error(w, "Dispatch created but trip creation failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Respond with both Dispatch and Trip
+	response := map[string]interface{}{
+		"dispatch": d,
+		"trip":     trip,
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(d)
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(response)
 }
 
 // Get all dispatches (with driver + vehicle info)

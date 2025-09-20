@@ -95,37 +95,33 @@ func sseHandler(w http.ResponseWriter, r *http.Request) {
 
 // ---------------- CRUD ----------------
 
-func CreateTrip(w http.ResponseWriter, r *http.Request) {
+// AutoCreateTrip is called by CreateDispatch to attach a trip automatically
+func AutoCreateTrip(dispatchID int, driverID int, vehicleID int) (*Trips, error) {
 	var t Trips
-	if err := json.NewDecoder(r.Body).Decode(&t); err != nil {
-		http.Error(w, "Invalid input", http.StatusBadRequest)
-		return
-	}
-
 	err := dbPool.QueryRow(
 		context.Background(),
 		`INSERT INTO trips (dispatch_id, driver_id, vehicle_id, status, latitude, longitude)
-		 VALUES ($1,$2,$3,$4,$5,$6)
-		 RETURNING id, last_updated`,
-		t.DispatchID, t.Driver.IDNumber, t.Vehicle.ID, "started", t.Latitude, t.Longitude,
-	).Scan(&t.ID, &t.LastUpdated)
-
+		 VALUES ($1,$2,$3,'started',0,0)
+		 RETURNING id, status, last_updated`,
+		dispatchID, driverID, vehicleID,
+	).Scan(&t.ID, &t.Status, &t.LastUpdated)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return nil, err
 	}
 
-	t.Status = "started"
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(t)
+	t.DispatchID = dispatchID
+	t.Driver.IDNumber = driverID
+	t.Vehicle.ID = vehicleID
 
+	// broadcast new trip
 	broadcastToSSE(map[string]interface{}{
 		"type": "trip_created",
 		"trip": t,
 	})
+
+	return &t, nil
 }
 
-// GetTrips now returns only ACTIVE trips
 func GetTrips(w http.ResponseWriter, r *http.Request) {
 	rows, err := dbPool.Query(context.Background(),
 		`SELECT id, dispatch_id, driver_id, vehicle_id, status, latitude, longitude, last_updated 
@@ -268,13 +264,70 @@ func UpdateTripLocation(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(t)
 }
 
+// ---------------- New Endpoints ----------------
+
+// GetTripsByDispatch fetches all trips for a given dispatch
+func GetTripsByDispatch(w http.ResponseWriter, r *http.Request) {
+	idStr := mux.Vars(r)["dispatchId"]
+	dispatchID, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Invalid Dispatch ID", http.StatusBadRequest)
+		return
+	}
+
+	rows, err := dbPool.Query(context.Background(),
+		`SELECT id, dispatch_id, driver_id, vehicle_id, status, latitude, longitude, last_updated
+		 FROM trips WHERE dispatch_id=$1`, dispatchID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var res []Trips
+	for rows.Next() {
+		var t Trips
+		if err := rows.Scan(&t.ID, &t.DispatchID, &t.Driver.IDNumber, &t.Vehicle.ID,
+			&t.Status, &t.Latitude, &t.Longitude, &t.LastUpdated); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		res = append(res, t)
+	}
+
+	json.NewEncoder(w).Encode(res)
+}
+
+// CompleteTrip marks a trip as completed
+func CompleteTrip(w http.ResponseWriter, r *http.Request) {
+	idStr := mux.Vars(r)["id"]
+	id, _ := strconv.Atoi(idStr)
+
+	_, err := dbPool.Exec(context.Background(),
+		`UPDATE trips SET status='completed', last_updated=NOW() WHERE id=$1`, id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	broadcastToSSE(map[string]interface{}{
+		"type":   "trip_completed",
+		"tripId": id,
+	})
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // RegisterTripRoutes registers all trip endpoints
 func RegisterTripRoutes(r *mux.Router) {
-	r.HandleFunc("/trips", CreateTrip).Methods("POST")
 	r.HandleFunc("/trips", GetTrips).Methods("GET")
 	r.HandleFunc("/trips/{id}", GetTrip).Methods("GET")
 	r.HandleFunc("/trips/{id}", UpdateTrip).Methods("PUT")
 	r.HandleFunc("/trips/{id}", DeleteTrip).Methods("DELETE")
+	r.HandleFunc("/trips/{id}/complete", CompleteTrip).Methods("PUT")
+
+	// Fetch trips by dispatch
+	r.HandleFunc("/dispatches/{dispatchId}/trips", GetTripsByDispatch).Methods("GET")
 
 	// Live tracking
 	r.HandleFunc("/trips/{id}/location", UpdateTripLocation).Methods("PUT")
@@ -282,6 +335,3 @@ func RegisterTripRoutes(r *mux.Router) {
 	// SSE stream for admin/dispatch to receive live updates
 	r.HandleFunc("/trips/stream", sseHandler).Methods("GET")
 }
-
-
-
