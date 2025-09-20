@@ -76,8 +76,64 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Driver " + strconv.Itoa(creds.IDNumber) + " logged in!"))
 }
 
+func GetDriversHandler(w http.ResponseWriter, r *http.Request) {
+	if db == nil {
+		http.Error(w, "Database not initialized", http.StatusInternalServerError)
+		return
+	}
+
+	rows, err := db.Query(r.Context(), "SELECT id_number, first_name, last_name FROM drivers")
+	if err != nil {
+		http.Error(w, "Failed to fetch drivers: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var drivers []Driver
+	for rows.Next() {
+		var d Driver
+		if err := rows.Scan(&d.IDNumber, &d.FirstName, &d.LastName); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		drivers = append(drivers, d)
+	}
+
+	json.NewEncoder(w).Encode(drivers)
+}
+
+// GetDriverByIDHandler fetches a single driver by IDNumber
+func GetDriverByIDHandler(w http.ResponseWriter, r *http.Request) {
+	if db == nil {
+		http.Error(w, "Database not initialized", http.StatusInternalServerError)
+		return
+	}
+
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Invalid driver ID", http.StatusBadRequest)
+		return
+	}
+
+	var d Driver
+	err = db.QueryRow(r.Context(),
+		"SELECT id_number, first_name, last_name FROM drivers WHERE id_number=$1", id,
+	).Scan(&d.IDNumber, &d.FirstName, &d.LastName)
+
+	if err != nil {
+		http.Error(w, "Driver not found", http.StatusNotFound)
+		return
+	}
+
+	json.NewEncoder(w).Encode(d)
+}
+
 // RegisterDriverRoutes registers the driver endpoints to the router
 func RegisterDriverRoutes(r *mux.Router) {
 	r.HandleFunc("/register", RegisterHandler).Methods("POST")
 	r.HandleFunc("/login", LoginHandler).Methods("POST")
+	r.HandleFunc("/all", GetDriversHandler).Methods("GET")
+	r.HandleFunc("/{id}", GetDriverByIDHandler).Methods("GET")
 }
