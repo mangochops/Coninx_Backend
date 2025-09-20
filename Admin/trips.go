@@ -21,6 +21,7 @@ type Trips struct {
 	Dispatch    *Dispatch     `json:"dispatch,omitempty"`
 	Driver      Driver.Driver `json:"driver"`
 	Vehicle     Vehicle       `json:"vehicle"`
+	Destination string        `json:"destination"`
 	Status      string        `json:"status"`
 	Latitude    float64       `json:"latitude"`
 	Longitude   float64       `json:"longitude"`
@@ -96,22 +97,28 @@ func sseHandler(w http.ResponseWriter, r *http.Request) {
 // ---------------- CRUD ----------------
 
 // AutoCreateTrip is called by CreateDispatch to attach a trip automatically
-func AutoCreateTrip(dispatchID int, driverID int, vehicleID int) (*Trips, error) {
+func AutoCreateTrip(dispatchID int, driverID int, vehicleID int, destination string) (*Trips, error) {
 	var t Trips
 	err := dbPool.QueryRow(
 		context.Background(),
-		`INSERT INTO trips (dispatch_id, driver_id, vehicle_id, status, latitude, longitude)
-		 VALUES ($1,$2,$3,'started',0,0)
-		 RETURNING id, status, last_updated`,
-		dispatchID, driverID, vehicleID,
-	).Scan(&t.ID, &t.Status, &t.LastUpdated)
+		`INSERT INTO trips (dispatch_id, driver_id, vehicle_id, destination, status, latitude, longitude, last_updated)
+		 VALUES ($1, $2, $3, $4, 'started', 0, 0, NOW())
+		 RETURNING id, dispatch_id, driver_id, vehicle_id, destination, status, latitude, longitude, last_updated`,
+		dispatchID, driverID, vehicleID, destination,
+	).Scan(
+		&t.ID,
+		&t.DispatchID,
+		&t.Driver.IDNumber, // use IDNumber as per Driver.Driver struct
+		&t.Vehicle.ID,      // assuming Trips struct nests Vehicle
+		&t.Destination,
+		&t.Status,
+		&t.Latitude,
+		&t.Longitude,
+		&t.LastUpdated,
+	)
 	if err != nil {
 		return nil, err
 	}
-
-	t.DispatchID = dispatchID
-	t.Driver.IDNumber = driverID
-	t.Vehicle.ID = vehicleID
 
 	// broadcast new trip
 	broadcastToSSE(map[string]interface{}{
