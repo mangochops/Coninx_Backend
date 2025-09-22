@@ -8,11 +8,12 @@ import (
 	"os"
 
 	"github.com/gorilla/mux"
-	"github.com/jackc/pgx/v5"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
-	"github.com/rs/cors"
 	"github.com/mangochops/coninx_backend/Admin"
 	"github.com/mangochops/coninx_backend/Driver"
+	"github.com/rs/cors"
 )
 
 func main() {
@@ -25,39 +26,37 @@ func main() {
 	if dbURL == "" {
 		log.Fatal("DB_URL environment variable not set")
 	}
-
-	// Connect to PostgreSQL
-	conn, err := pgx.Connect(context.Background(), dbURL)
+	// Connect to PostgreSQL using pgxpool
+	pool, err := pgxpool.New(context.Background(), dbURL)
 	if err != nil {
-		log.Fatalf("Unable to connect to database: %v\n", err)
+		log.Fatalf("Unable to create connection pool: %v\n", err)
 	}
 	fmt.Println("Connected to database")
 
 	defer func() {
-		if err := conn.Close(context.Background()); err != nil {
-			log.Printf("Error closing database connection: %v\n", err)
-		}
+		pool.Close()
 	}()
 
 	// Set search path to public schema
-	_, err = conn.Exec(context.Background(), "SET search_path TO public")
+	_, err = pool.Exec(context.Background(), "SET search_path TO public")
 	if err != nil {
 		log.Fatalf("Failed to set search path: %v\n", err)
 	}
 
 	// Initialize DB connections for packages
 	Admin.InitDBPool(dbURL)
-	Driver.InitDB(conn)
+	Driver.InitDB(pool)
+	// Driver.InitDB(conn)
 
 	// Test the connection
+	// Test the connection
 	var result int
-	err = conn.QueryRow(context.Background(), "SELECT 1").Scan(&result)
+	err = pool.QueryRow(context.Background(), "SELECT 1").Scan(&result)
 	if err != nil {
 		log.Printf("Failed to execute test query: %v\n", err)
 	} else {
 		fmt.Printf("Database test query successful! Result: %d\n", result)
 	}
-
 	// Set up router
 	router := mux.NewRouter()
 
@@ -82,20 +81,19 @@ func main() {
 	})
 
 	// Enable CORS
-c := cors.New(cors.Options{
-    AllowedOrigins: []string{
-        "https://conninx-dashboard.vercel.app", // production
-        "http://localhost:3000",                // local dev
-    },
-    AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-    AllowedHeaders: []string{"Content-Type", "Authorization"},
-    AllowCredentials: true,
-    Debug: true, // shows preflight logs in terminal
-})
+	c := cors.New(cors.Options{
+		AllowedOrigins: []string{
+			"https://conninx-dashboard.vercel.app", // production
+			"http://localhost:3000",                // local dev
+		},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Content-Type", "Authorization"},
+		AllowCredentials: true,
+		Debug:            true, // shows preflight logs in terminal
+	})
 
-// Start server
-fmt.Println("Server running on :5000")
-log.Fatal(http.ListenAndServe("0.0.0.0:5000", c.Handler(router)))
-
+	// Start server
+	fmt.Println("Server running on :5000")
+	log.Fatal(http.ListenAndServe("0.0.0.0:5000", c.Handler(router)))
 
 }

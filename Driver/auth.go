@@ -6,7 +6,8 @@ import (
 	"strconv"
 
 	"github.com/gorilla/mux"
-	"github.com/jackc/pgx/v5"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Driver struct {
@@ -17,11 +18,11 @@ type Driver struct {
 }
 
 var drivers []Driver
-var db *pgx.Conn
+var db *pgxpool.Pool
 
 // InitDB sets the global DB connection
-func InitDB(conn *pgx.Conn) {
-	db = conn
+func InitDB(pool *pgxpool.Pool) {
+	db = pool
 }
 
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
