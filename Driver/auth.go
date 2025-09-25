@@ -6,15 +6,15 @@ import (
 	"strconv"
 
 	"github.com/gorilla/mux"
-
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Driver struct {
-	FirstName string `json:"firstName"`
-	LastName  string `json:"lastName"`
-	IDNumber  int    `json:"idNumber"`
-	Password  string `json:"password"`
+	FirstName   string `json:"firstName"`
+	LastName    string `json:"lastName"`
+	IDNumber    int    `json:"idNumber"`
+	Password    string `json:"password"`
+	PhoneNumber string `json:"phoneNumber"`
 }
 
 var drivers []Driver
@@ -35,19 +35,22 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid input", http.StatusBadRequest)
 		return
 	}
-	// Save driver to database
+
 	if db == nil {
 		http.Error(w, "Database not initialized", http.StatusInternalServerError)
 		return
 	}
+
+	// Save driver to database with phone_number
 	_, err := db.Exec(r.Context(),
-		"INSERT INTO drivers (first_name, last_name, id_number, password) VALUES ($1, $2, $3, $4)",
-		d.FirstName, d.LastName, d.IDNumber, d.Password,
+		"INSERT INTO drivers (first_name, last_name, id_number, password, phone_number) VALUES ($1, $2, $3, $4, $5)",
+		d.FirstName, d.LastName, d.IDNumber, d.Password, d.PhoneNumber,
 	)
 	if err != nil {
 		http.Error(w, "Failed to register driver: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte("Driver " + d.FirstName + " " + d.LastName + " registered successfully!"))
 }
@@ -83,7 +86,7 @@ func GetDriversHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := db.Query(r.Context(), "SELECT id_number, first_name, last_name FROM drivers")
+	rows, err := db.Query(r.Context(), "SELECT id_number, first_name, last_name, phone_number FROM drivers")
 	if err != nil {
 		http.Error(w, "Failed to fetch drivers: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -93,7 +96,7 @@ func GetDriversHandler(w http.ResponseWriter, r *http.Request) {
 	var drivers []Driver
 	for rows.Next() {
 		var d Driver
-		if err := rows.Scan(&d.IDNumber, &d.FirstName, &d.LastName); err != nil {
+		if err := rows.Scan(&d.IDNumber, &d.FirstName, &d.LastName, &d.PhoneNumber); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -120,8 +123,8 @@ func GetDriverByIDHandler(w http.ResponseWriter, r *http.Request) {
 
 	var d Driver
 	err = db.QueryRow(r.Context(),
-		"SELECT id_number, first_name, last_name FROM drivers WHERE id_number=$1", id,
-	).Scan(&d.IDNumber, &d.FirstName, &d.LastName)
+		"SELECT id_number, first_name, last_name, phone_number FROM drivers WHERE id_number=$1", id,
+	).Scan(&d.IDNumber, &d.FirstName, &d.LastName, &d.PhoneNumber)
 
 	if err != nil {
 		http.Error(w, "Driver not found", http.StatusNotFound)
