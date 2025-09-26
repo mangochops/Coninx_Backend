@@ -2,14 +2,15 @@ package Driver
 
 import (
 	"encoding/json"
-	
+	"log"
 	"net/http"
-	"strconv"
 	"sync"
 
 	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
 )
 
+// Coordinates and Trip structs
 type Coordinates struct {
 	Latitude  float64 `json:"latitude"`
 	Longitude float64 `json:"longitude"`
@@ -27,106 +28,91 @@ type Trip struct {
 
 var (
 	trips   = make(map[int]Trip)
-	nextID  = 1
 	tripsMu sync.Mutex
+
+	clients   = make(map[*websocket.Conn]int) // track subscribed driverId
+	clientsMu sync.Mutex
+	upgrader  = websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool { return true },
+	}
 )
 
-// Create a new trip
-func CreateTripHandler(w http.ResponseWriter, r *http.Request) {
-	var t Trip
-	if err := json.NewDecoder(r.Body).Decode(&t); err != nil {
-		http.Error(w, "Invalid input", http.StatusBadRequest)
-		return
-	}
-	tripsMu.Lock()
-	t.ID = nextID
-	nextID++
-	trips[t.ID] = t
-	tripsMu.Unlock()
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(t)
-}
-
-// Get trip info by ID
-func GetTripHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := mux.Vars(r)["id"]
-	id, err := strconv.Atoi(idStr)
+// WebSocket handler
+func TripWSHandler(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		http.Error(w, "Invalid trip ID", http.StatusBadRequest)
+		log.Println("WS upgrade error:", err)
 		return
 	}
-	tripsMu.Lock()
-	trip, ok := trips[id]
-	tripsMu.Unlock()
-	if !ok {
-		http.NotFound(w, r)
-		return
+	defer conn.Close()
+
+	// Register client with no subscription initially
+	clientsMu.Lock()
+	clients[conn] = 0
+	clientsMu.Unlock()
+
+	for {
+		_, msg, err := conn.ReadMessage()
+		if err != nil {
+			break
+		}
+
+		var msgData struct {
+			Type      string  `json:"type"`
+			DriverID  int     `json:"driverId"`
+			TripID    int     `json:"tripId,omitempty"`
+			Latitude  float64 `json:"latitude,omitempty"`
+			Longitude float64 `json:"longitude,omitempty"`
+		}
+
+		if err := json.Unmarshal(msg, &msgData); err != nil {
+			log.Println("WS unmarshal error:", err)
+			continue
+		}
+
+		switch msgData.Type {
+		case "subscribe":
+			// Subscribe client to a specific driver
+			clientsMu.Lock()
+			clients[conn] = msgData.DriverID
+			clientsMu.Unlock()
+
+		case "update_location":
+			// Update trip coordinates
+			tripsMu.Lock()
+			trip, ok := trips[msgData.TripID]
+			if ok {
+				trip.Coordinates = Coordinates{Latitude: msgData.Latitude, Longitude: msgData.Longitude}
+				trips[msgData.TripID] = trip
+			}
+			tripsMu.Unlock()
+
+			if ok {
+				broadcastDriverUpdate(trip)
+			}
+		}
 	}
-	json.NewEncoder(w).Encode(trip)
+
+	// Remove client when disconnected
+	clientsMu.Lock()
+	delete(clients, conn)
+	clientsMu.Unlock()
 }
 
-// Update trip coordinates
-func UpdateTripCoordinatesHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := mux.Vars(r)["id"]
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		http.Error(w, "Invalid trip ID", http.StatusBadRequest)
-		return
+// Broadcast only to clients subscribed to this driver
+func broadcastDriverUpdate(trip Trip) {
+	clientsMu.Lock()
+	defer clientsMu.Unlock()
+
+	data, _ := json.Marshal(trip)
+	for client, driverID := range clients {
+		if driverID == trip.DriverID {
+			client.WriteMessage(websocket.TextMessage, data)
+		}
 	}
-	var coords Coordinates
-	if err := json.NewDecoder(r.Body).Decode(&coords); err != nil {
-		http.Error(w, "Invalid input", http.StatusBadRequest)
-		return
-	}
-	tripsMu.Lock()
-	trip, ok := trips[id]
-	if ok {
-		trip.Coordinates = coords
-		trips[id] = trip
-	}
-	tripsMu.Unlock()
-	if !ok {
-		http.NotFound(w, r)
-		return
-	}
-	json.NewEncoder(w).Encode(trip)
 }
 
-// Update trip status
-func UpdateTripStatusHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := mux.Vars(r)["id"]
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		http.Error(w, "Invalid trip ID", http.StatusBadRequest)
-		return
-	}
-	var status struct {
-		Status string `json:"status"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&status); err != nil {
-		http.Error(w, "Invalid input", http.StatusBadRequest)
-		return
-	}
-	tripsMu.Lock()
-	trip, ok := trips[id]
-	if ok {
-		trip.Status = status.Status
-		trips[id] = trip
-	}
-	tripsMu.Unlock()
-	if !ok {
-		http.NotFound(w, r)
-		return
-	}
-	json.NewEncoder(w).Encode(trip)
-}
-
-// RegisterTripRoutes registers all trip endpoints to the router
+// Register trip routes (including WS)
 func RegisterTripRoutes(r *mux.Router) {
-	r.HandleFunc("/trip", CreateTripHandler).Methods("POST")
-	r.HandleFunc("/trip/{id}", GetTripHandler).Methods("GET")
-	r.HandleFunc("/trip/{id}/coordinates", UpdateTripCoordinatesHandler).Methods("PUT")
-	r.HandleFunc("/trip/{id}/status", UpdateTripStatusHandler).Methods("PUT")
+	r.HandleFunc("/ws/trips", TripWSHandler)
 }
-
-
