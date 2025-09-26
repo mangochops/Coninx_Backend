@@ -14,10 +14,9 @@ type Driver struct {
 	LastName    string `json:"lastName"`
 	IDNumber    int    `json:"idNumber"`
 	Password    string `json:"password"`
-	PhoneNumber string `json:"phoneNumber"`
+	PhoneNumber *int64 `json:"phoneNumber,omitempty"` // optional
 }
 
-var drivers []Driver
 var db *pgxpool.Pool
 
 // InitDB sets the global DB connection
@@ -30,6 +29,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Only POST allowed", http.StatusMethodNotAllowed)
 		return
 	}
+
 	var d Driver
 	if err := json.NewDecoder(r.Body).Decode(&d); err != nil {
 		http.Error(w, "Invalid input", http.StatusBadRequest)
@@ -41,7 +41,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Save driver to database with phone_number
+	// Insert NULL if phone number is not provided
 	_, err := db.Exec(r.Context(),
 		"INSERT INTO drivers (first_name, last_name, id_number, password, phone_number) VALUES ($1, $2, $3, $4, $5)",
 		d.FirstName, d.LastName, d.IDNumber, d.Password, d.PhoneNumber,
@@ -55,38 +55,14 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Driver " + d.FirstName + " " + d.LastName + " registered successfully!"))
 }
 
-func GetDriver(w http.ResponseWriter, r *http.Request) {
-	json.NewEncoder(w).Encode(drivers)
-}
-
-// Optionally, add a login handler for drivers
-func LoginHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Only POST allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var creds struct {
-		IDNumber int    `json:"idNumber"`
-		Password string `json:"password"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
-		http.Error(w, "Invalid input", http.StatusBadRequest)
-		return
-	}
-
-	// TODO: Authenticate driver with database
-	w.Write([]byte("Driver " + strconv.Itoa(creds.IDNumber) + " logged in!"))
-}
-
 func GetDriversHandler(w http.ResponseWriter, r *http.Request) {
 	if db == nil {
 		http.Error(w, "Database not initialized", http.StatusInternalServerError)
 		return
 	}
 
-	rows, err := db.Query(r.Context(), "SELECT id_number, first_name, last_name, phone_number FROM drivers")
+	rows, err := db.Query(r.Context(),
+		"SELECT id_number, first_name, last_name, phone_number FROM drivers")
 	if err != nil {
 		http.Error(w, "Failed to fetch drivers: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -106,7 +82,6 @@ func GetDriversHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(drivers)
 }
 
-// GetDriverByIDHandler fetches a single driver by IDNumber
 func GetDriverByIDHandler(w http.ResponseWriter, r *http.Request) {
 	if db == nil {
 		http.Error(w, "Database not initialized", http.StatusInternalServerError)
@@ -132,6 +107,26 @@ func GetDriverByIDHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(d)
+}
+
+func LoginHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Only POST allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var creds struct {
+		IDNumber int    `json:"idNumber"`
+		Password string `json:"password"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
+		http.Error(w, "Invalid input", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: Authenticate driver with database
+	w.Write([]byte("Driver " + strconv.Itoa(creds.IDNumber) + " logged in!"))
 }
 
 // RegisterDriverRoutes registers the driver endpoints to the router
