@@ -14,7 +14,7 @@ type Driver struct {
 	LastName    string `json:"lastName"`
 	IDNumber    int    `json:"idNumber"`
 	Password    string `json:"password"`
-	PhoneNumber *int64 `json:"phoneNumber,omitempty"` // optional
+	PhoneNumber *int64 `json:"phoneNumber,omitempty"` // nullable
 }
 
 var db *pgxpool.Pool
