@@ -60,6 +60,7 @@ func broadcastToSSE(payload interface{}) {
 // sseHandler handles new SSE client connections.
 func sseHandler(w http.ResponseWriter, r *http.Request) {
 	// Required headers for SSE
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
