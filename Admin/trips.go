@@ -59,7 +59,7 @@ func broadcastToSSE(payload interface{}) {
 
 // sseHandler handles new SSE client connections.
 func sseHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	// Required headers for SSE
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -71,23 +71,27 @@ func sseHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	clientCh := make(sseClient, 10)
+
+	// Register client
 	sseClientsMu.Lock()
 	sseClients[clientCh] = true
 	sseClientsMu.Unlock()
 
-	notify := w.(http.CloseNotifier).CloseNotify()
+	// Remove when connection closes
+	ctx := r.Context()
 	go func() {
-		<-notify
+		<-ctx.Done()
 		sseClientsMu.Lock()
 		delete(sseClients, clientCh)
 		sseClientsMu.Unlock()
 		close(clientCh)
 	}()
 
-	// Initial connected message
-	fmt.Fprintf(w, ": connected\n\n")
+	// Send an initial event so frontend knows it’s connected
+	fmt.Fprintf(w, "event: connected\ndata: %s\n\n", `"SSE connected"`)
 	flusher.Flush()
 
+	// Listen for messages
 	for msg := range clientCh {
 		fmt.Fprintf(w, "event: message\n")
 		fmt.Fprintf(w, "data: %s\n\n", msg)
