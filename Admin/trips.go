@@ -59,6 +59,12 @@ func broadcastToSSE(payload interface{}) {
 
 // sseHandler handles new SSE client connections.
 func sseHandler(w http.ResponseWriter, r *http.Request) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[SSE] Panic recovered: %v", r)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		}
+	}()
 	log.Printf("[SSE] Incoming connection from %s", r.RemoteAddr)
 	// Required headers for SSE
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -103,6 +109,7 @@ func sseHandler(w http.ResponseWriter, r *http.Request) {
 	_, err := fmt.Fprintf(w, "event: connected\ndata: %s\n\n", `"SSE connected"`)
 	if err != nil {
 		log.Printf("[SSE] Initial write failed: %v", err)
+		http.Error(w, "Failed to establish SSE connection", http.StatusBadRequest)
 		return
 	}
 	flusher.Flush()
