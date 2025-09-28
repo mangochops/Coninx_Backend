@@ -59,14 +59,24 @@ func broadcastToSSE(payload interface{}) {
 
 // sseHandler handles new SSE client connections.
 func sseHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[SSE] Incoming connection from %s", r.RemoteAddr)
 	// Required headers for SSE
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no") // for nginx, disables buffering
+
+	// Check for GET method
+	if r.Method != http.MethodGet {
+		log.Printf("[SSE] 405 Method Not Allowed: %s", r.Method)
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
+		log.Printf("[SSE] Streaming unsupported for %s", r.RemoteAddr)
 		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
 		return
 	}
@@ -86,16 +96,29 @@ func sseHandler(w http.ResponseWriter, r *http.Request) {
 		delete(sseClients, clientCh)
 		sseClientsMu.Unlock()
 		close(clientCh)
+		log.Printf("[SSE] Connection closed: %s", r.RemoteAddr)
 	}()
 
 	// Send an initial event so frontend knows it’s connected
-	fmt.Fprintf(w, "event: connected\ndata: %s\n\n", `"SSE connected"`)
+	_, err := fmt.Fprintf(w, "event: connected\ndata: %s\n\n", `"SSE connected"`)
+	if err != nil {
+		log.Printf("[SSE] Initial write failed: %v", err)
+		return
+	}
 	flusher.Flush()
 
 	// Listen for messages
 	for msg := range clientCh {
-		fmt.Fprintf(w, "event: message\n")
-		fmt.Fprintf(w, "data: %s\n\n", msg)
+		_, err := fmt.Fprintf(w, "event: message\n")
+		if err != nil {
+			log.Printf("[SSE] Write error: %v", err)
+			break
+		}
+		_, err = fmt.Fprintf(w, "data: %s\n\n", msg)
+		if err != nil {
+			log.Printf("[SSE] Write error: %v", err)
+			break
+		}
 		flusher.Flush()
 	}
 }
