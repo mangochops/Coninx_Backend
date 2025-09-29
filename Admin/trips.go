@@ -59,21 +59,15 @@ func broadcastToSSE(payload interface{}) {
 
 // sseHandler handles new SSE client connections.
 func sseHandler(w http.ResponseWriter, r *http.Request) {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Printf("[SSE] Panic recovered: %v", r)
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		}
-	}()
 	log.Printf("[SSE] Incoming connection from %s", r.RemoteAddr)
-	// Required headers for SSE
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	// SSE headers
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("X-Accel-Buffering", "no") // for nginx, disables buffering
+	w.Header().Set("X-Accel-Buffering", "no") // disable buffering (nginx)
 
-	// Check for GET method
+	// Only allow GET
 	if r.Method != http.MethodGet {
 		log.Printf("[SSE] 405 Method Not Allowed: %s", r.Method)
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
@@ -82,7 +76,6 @@ func sseHandler(w http.ResponseWriter, r *http.Request) {
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		log.Printf("[SSE] Streaming unsupported for %s", r.RemoteAddr)
 		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
 		return
 	}
@@ -94,7 +87,7 @@ func sseHandler(w http.ResponseWriter, r *http.Request) {
 	sseClients[clientCh] = true
 	sseClientsMu.Unlock()
 
-	// Remove when connection closes
+	// Remove client on disconnect
 	ctx := r.Context()
 	go func() {
 		<-ctx.Done()
@@ -105,24 +98,13 @@ func sseHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[SSE] Connection closed: %s", r.RemoteAddr)
 	}()
 
-	// Send an initial event so frontend knows it’s connected
-	_, err := fmt.Fprintf(w, "event: connected\ndata: %s\n\n", `"SSE connected"`)
-	if err != nil {
-		log.Printf("[SSE] Initial write failed: %v", err)
-		http.Error(w, "Failed to establish SSE connection", http.StatusBadRequest)
-		return
-	}
+	// Initial handshake event
+	fmt.Fprintf(w, "event: connected\ndata: \"SSE connected\"\n\n")
 	flusher.Flush()
 
-	// Listen for messages
+	// Stream messages
 	for msg := range clientCh {
-		_, err := fmt.Fprintf(w, "event: message\n")
-		if err != nil {
-			log.Printf("[SSE] Write error: %v", err)
-			break
-		}
-		_, err = fmt.Fprintf(w, "data: %s\n\n", msg)
-		if err != nil {
+		if _, err := fmt.Fprintf(w, "event: message\ndata: %s\n\n", msg); err != nil {
 			log.Printf("[SSE] Write error: %v", err)
 			break
 		}
