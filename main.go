@@ -85,6 +85,8 @@ func main() {
 		AllowedOrigins: []string{
 			"https://conninx-dashboard.vercel.app", // production
 			"http://localhost:3000",                // local dev
+			"http://127.0.0.1:3000",
+			"http://0.0.0.0:3000",
 		},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Content-Type", "Authorization"},
