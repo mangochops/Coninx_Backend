@@ -11,10 +11,11 @@ import (
 
 // Delivery represents proof of completed dispatch by driver
 type Delivery struct {
-	ID         int       `json:"id"`
-	DispatchID int       `json:"dispatchId"`
-	TripID     int       `json:"tripId"`
-	Date       time.Time `json:"date"`
+	ID         int `json:"id"`
+	DispatchID int `json:"dispatchId"`
+
+	Date   time.Time `json:"date"`
+	TripID int       `json:"tripId"`
 }
 
 // ---------------- CRUD ----------------
@@ -27,7 +28,23 @@ func CreateDeliveryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if trip exists in admin.trips
+	var tripExists bool
 	err := db.QueryRow(
+		context.Background(),
+		`SELECT EXISTS(SELECT 1 FROM trips WHERE id=$1)`,
+		d.TripID,
+	).Scan(&tripExists)
+	if err != nil {
+		http.Error(w, "Failed to check trip: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !tripExists {
+		http.Error(w, "Trip not found", http.StatusBadRequest)
+		return
+	}
+
+	err = db.QueryRow(
 		context.Background(),
 		`INSERT INTO deliveries (dispatch_id, trip_id, date)
 		 VALUES ($1, $2, NOW())

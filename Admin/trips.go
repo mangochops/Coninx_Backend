@@ -3,7 +3,7 @@ package Admin
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	
 	"log"
 	"net/http"
 	"strconv"
@@ -58,59 +58,7 @@ func broadcastToSSE(payload interface{}) {
 }
 
 // sseHandler handles new SSE client connections.
-func sseHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[SSE] Incoming connection from %s", r.RemoteAddr)
 
-	// SSE headers
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("X-Accel-Buffering", "no") // disable buffering (nginx)
-
-	// Only allow GET
-	if r.Method != http.MethodGet {
-		log.Printf("[SSE] 405 Method Not Allowed: %s", r.Method)
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
-		return
-	}
-
-	clientCh := make(sseClient, 10)
-
-	// Register client
-	sseClientsMu.Lock()
-	sseClients[clientCh] = true
-	sseClientsMu.Unlock()
-
-	// Remove client on disconnect
-	ctx := r.Context()
-	go func() {
-		<-ctx.Done()
-		sseClientsMu.Lock()
-		delete(sseClients, clientCh)
-		sseClientsMu.Unlock()
-		close(clientCh)
-		log.Printf("[SSE] Connection closed: %s", r.RemoteAddr)
-	}()
-
-	// Initial handshake event
-	fmt.Fprintf(w, "event: connected\ndata: \"SSE connected\"\n\n")
-	flusher.Flush()
-
-	// Stream messages
-	for msg := range clientCh {
-		if _, err := fmt.Fprintf(w, "event: message\ndata: %s\n\n", msg); err != nil {
-			log.Printf("[SSE] Write error: %v", err)
-			break
-		}
-		flusher.Flush()
-	}
-}
 
 // ---------------- CRUD ----------------
 
@@ -359,5 +307,5 @@ func RegisterTripRoutes(r *mux.Router) {
 	r.HandleFunc("/trips/{id}/location", UpdateTripLocation).Methods("PUT")
 
 	// SSE stream for admin/dispatch to receive live updates
-	r.HandleFunc("/trips/stream", sseHandler).Methods("GET")
+	
 }
