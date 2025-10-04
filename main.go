@@ -79,6 +79,7 @@ func main() {
 			"https://*.vercel.app",                 // Vercel preview deployments
 			"http://localhost:3000",                // local dev
 			"http://127.0.0.1:3000",
+			"http://127.0.0.1:8000",
 		},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Content-Type", "Authorization"},
