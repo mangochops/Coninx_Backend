@@ -115,8 +115,9 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Accept IDNumber as string to match frontend input
 	var creds struct {
-		IDNumber int    `json:"idNumber"`
+		IDNumber string `json:"idNumber"`
 		Password string `json:"password"`
 	}
 
@@ -125,8 +126,37 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Authenticate driver with database
-	w.Write([]byte("Driver " + strconv.Itoa(creds.IDNumber) + " logged in!"))
+	// Convert IDNumber to int
+	idNum, err := strconv.Atoi(creds.IDNumber)
+	if err != nil {
+		http.Error(w, "Invalid ID number", http.StatusBadRequest)
+		return
+	}
+
+	// Check DB for driver
+	var storedPassword string
+	err = db.QueryRow(r.Context(),
+		"SELECT password FROM drivers WHERE id_number=$1", idNum,
+	).Scan(&storedPassword)
+	if err != nil {
+		http.Error(w, "Driver not found", http.StatusNotFound)
+		return
+	}
+
+	// Check password
+	if storedPassword != creds.Password {
+		http.Error(w, "Incorrect password", http.StatusUnauthorized)
+		return
+	}
+
+	// Success — return JSON
+	resp := map[string]interface{}{
+		"driverId": idNum,
+		"message":  "Login successful",
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
 }
 
 // RegisterDriverRoutes registers the driver endpoints to the router
