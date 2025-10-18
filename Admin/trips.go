@@ -3,7 +3,7 @@ package Admin
 import (
 	"context"
 	"encoding/json"
-	
+
 	"log"
 	"net/http"
 	"strconv"
@@ -58,7 +58,6 @@ func broadcastToSSE(payload interface{}) {
 }
 
 // sseHandler handles new SSE client connections.
-
 
 // ---------------- CRUD ----------------
 
@@ -306,6 +305,4 @@ func RegisterTripRoutes(r *mux.Router) {
 	// Live tracking
 	r.HandleFunc("/trips/{id}/location", UpdateTripLocation).Methods("PUT")
 
-	// SSE stream for admin/dispatch to receive live updates
-	
 }

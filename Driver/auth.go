@@ -159,10 +159,81 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+// UpdateDriverLocationHandler updates driver's latitude and longitude
+func UpdateDriverLocationHandler(w http.ResponseWriter, r *http.Request) {
+	if db == nil {
+		http.Error(w, "Database not initialized", http.StatusInternalServerError)
+		return
+	}
+
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Invalid driver ID", http.StatusBadRequest)
+		return
+	}
+
+	var loc struct {
+		Latitude  float64 `json:"latitude"`
+		Longitude float64 `json:"longitude"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&loc); err != nil {
+		http.Error(w, "Invalid input", http.StatusBadRequest)
+		return
+	}
+
+	_, err = db.Exec(r.Context(),
+		"UPDATE drivers SET latitude=$1, longitude=$2 WHERE id_number=$3",
+		loc.Latitude, loc.Longitude, id,
+	)
+	if err != nil {
+		http.Error(w, "Failed to update location: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Location updated successfully"))
+}
+
+// GetDriverLocationHandler returns driver’s latest location
+func GetDriverLocationHandler(w http.ResponseWriter, r *http.Request) {
+	if db == nil {
+		http.Error(w, "Database not initialized", http.StatusInternalServerError)
+		return
+	}
+
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Invalid driver ID", http.StatusBadRequest)
+		return
+	}
+
+	var loc struct {
+		Latitude  float64 `json:"latitude"`
+		Longitude float64 `json:"longitude"`
+	}
+	err = db.QueryRow(r.Context(),
+		"SELECT latitude, longitude FROM drivers WHERE id_number=$1", id,
+	).Scan(&loc.Latitude, &loc.Longitude)
+
+	if err != nil {
+		http.Error(w, "Driver location not found", http.StatusNotFound)
+		return
+	}
+
+	json.NewEncoder(w).Encode(loc)
+}
+
 // RegisterDriverRoutes registers the driver endpoints to the router
 func RegisterDriverRoutes(r *mux.Router) {
 	r.HandleFunc("/register", RegisterHandler).Methods("POST")
 	r.HandleFunc("/login", LoginHandler).Methods("POST")
 	r.HandleFunc("/all", GetDriversHandler).Methods("GET")
 	r.HandleFunc("/{id}", GetDriverByIDHandler).Methods("GET")
+	r.HandleFunc("/{id}/location", UpdateDriverLocationHandler).Methods("POST")
+	r.HandleFunc("/{id}/location", GetDriverLocationHandler).Methods("GET")
 }
