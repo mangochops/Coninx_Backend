@@ -331,6 +331,7 @@ func RegisterTripRoutes(r *mux.Router) {
 	r.HandleFunc("/trips/{id}", UpdateTrip).Methods("PUT")
 	r.HandleFunc("/trips/{id}", DeleteTrip).Methods("DELETE")
 	r.HandleFunc("/trips/{id}/complete", CompleteTrip).Methods("PUT")
+	r.HandleFunc("/drivers/{driverId}/trips", GetTripsByDriver).Methods("GET")
 
 	// Fetch trips by dispatch
 	r.HandleFunc("/dispatches/{dispatchId}/trips", GetTripsByDispatch).Methods("GET")
