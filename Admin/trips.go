@@ -142,6 +142,39 @@ func GetTrip(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(t)
 }
 
+// Get trips assigned to a specific driver
+func GetTripsByDriver(w http.ResponseWriter, r *http.Request) {
+	driverIDStr := mux.Vars(r)["driverId"]
+	driverID, err := strconv.Atoi(driverIDStr)
+	if err != nil {
+		http.Error(w, "Invalid driver ID", http.StatusBadRequest)
+		return
+	}
+
+	rows, err := dbPool.Query(context.Background(),
+		`SELECT id, dispatch_id, driver_id, vehicle_id, status, latitude, longitude, last_updated
+		 FROM trips WHERE driver_id=$1`, driverID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var res []Trips
+	for rows.Next() {
+		var t Trips
+		if err := rows.Scan(&t.ID, &t.DispatchID, &t.Driver.IDNumber, &t.Vehicle.ID,
+			&t.Status, &t.Latitude, &t.Longitude, &t.LastUpdated); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		res = append(res, t)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(res)
+}
+
 func UpdateTrip(w http.ResponseWriter, r *http.Request) {
 	idStr := mux.Vars(r)["id"]
 	id, err := strconv.Atoi(idStr)

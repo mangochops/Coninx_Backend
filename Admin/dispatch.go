@@ -217,6 +217,61 @@ func GetDispatch(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(d)
 }
 
+// Get dispatches for a specific driver
+func GetDispatchesByDriver(w http.ResponseWriter, r *http.Request) {
+	driverIDStr := mux.Vars(r)["driverId"]
+	driverID, err := strconv.Atoi(driverIDStr)
+	if err != nil {
+		http.Error(w, "Invalid driver ID", http.StatusBadRequest)
+		return
+	}
+
+	rows, err := dbPool.Query(context.Background(), `
+		SELECT d.id, d.recipient, d.location, d.invoice, d.date, d.verified,
+		       dr.id_number, dr.first_name || ' ' || dr.last_name AS driver_name,
+		       v.reg_no
+		FROM dispatches d
+		LEFT JOIN drivers dr ON d.driver_id = dr.id
+		LEFT JOIN vehicles v ON d.vehicle_id = v.id
+		WHERE d.driver_id=$1
+		ORDER BY d.date DESC
+	`, driverID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var dispatches []Dispatch
+	for rows.Next() {
+		var d Dispatch
+		var driverIDNumber sql.NullInt64
+		var driverName sql.NullString
+		var vehicleReg sql.NullString
+
+		if err := rows.Scan(&d.ID, &d.Recipient, &d.Location, &d.Invoice, &d.Date, &d.Verified,
+			&driverIDNumber, &driverName, &vehicleReg); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if driverIDNumber.Valid {
+			d.Driver.IDNumber = int(driverIDNumber.Int64)
+		}
+		if driverName.Valid {
+			d.Driver.FirstName = driverName.String
+		}
+		if vehicleReg.Valid {
+			d.Vehicle.RegNo = vehicleReg.String
+		}
+
+		dispatches = append(dispatches, d)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(dispatches)
+}
+
 // Update dispatch (recipient, location, invoice, driver, vehicle)
 func UpdateDispatch(w http.ResponseWriter, r *http.Request) {
 	idStr := mux.Vars(r)["id"]
@@ -394,6 +449,7 @@ func RegisterDispatchRoutes(r *mux.Router) {
 	r.HandleFunc("/dispatches/{id}", GetDispatch).Methods("GET")
 	r.HandleFunc("/dispatches/{id}", UpdateDispatch).Methods("PUT")
 	r.HandleFunc("/dispatches/{id}", DeleteDispatch).Methods("DELETE")
+	r.HandleFunc("/drivers/{driverId}/dispatches", GetDispatchesByDriver).Methods("GET")
 
 	// OTP routes
 	r.HandleFunc("/dispatches/{id}/send-otp", SendOTP).Methods("POST")
