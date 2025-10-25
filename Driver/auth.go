@@ -10,11 +10,12 @@ import (
 )
 
 type Driver struct {
+	ID          int    `json:"id"` // ✅ new primary key field
 	FirstName   string `json:"firstName"`
 	LastName    string `json:"lastName"`
 	IDNumber    int    `json:"idNumber"`
 	Password    string `json:"password"`
-	PhoneNumber *int64 `json:"phoneNumber,omitempty"` // nullable
+	PhoneNumber *int64 `json:"phoneNumber,omitempty"`
 }
 
 var db *pgxpool.Pool
@@ -24,6 +25,7 @@ func InitDB(pool *pgxpool.Pool) {
 	db = pool
 }
 
+// ========================= REGISTER DRIVER ===========================
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Only POST allowed", http.StatusMethodNotAllowed)
@@ -41,7 +43,6 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Insert NULL if phone number is not provided
 	_, err := db.Exec(r.Context(),
 		"INSERT INTO drivers (first_name, last_name, id_number, password, phone_number) VALUES ($1, $2, $3, $4, $5)",
 		d.FirstName, d.LastName, d.IDNumber, d.Password, d.PhoneNumber,
@@ -55,6 +56,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Driver " + d.FirstName + " " + d.LastName + " registered successfully!"))
 }
 
+// ========================= FETCH ALL DRIVERS ===========================
 func GetDriversHandler(w http.ResponseWriter, r *http.Request) {
 	if db == nil {
 		http.Error(w, "Database not initialized", http.StatusInternalServerError)
@@ -62,7 +64,7 @@ func GetDriversHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := db.Query(r.Context(),
-		"SELECT id_number, first_name, last_name, phone_number FROM drivers")
+		"SELECT id, id_number, first_name, last_name, phone_number FROM drivers")
 	if err != nil {
 		http.Error(w, "Failed to fetch drivers: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -72,7 +74,7 @@ func GetDriversHandler(w http.ResponseWriter, r *http.Request) {
 	var drivers []Driver
 	for rows.Next() {
 		var d Driver
-		if err := rows.Scan(&d.IDNumber, &d.FirstName, &d.LastName, &d.PhoneNumber); err != nil {
+		if err := rows.Scan(&d.ID, &d.IDNumber, &d.FirstName, &d.LastName, &d.PhoneNumber); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -82,6 +84,7 @@ func GetDriversHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(drivers)
 }
 
+// ========================= FETCH DRIVER BY ID ===========================
 func GetDriverByIDHandler(w http.ResponseWriter, r *http.Request) {
 	if db == nil {
 		http.Error(w, "Database not initialized", http.StatusInternalServerError)
@@ -98,8 +101,8 @@ func GetDriverByIDHandler(w http.ResponseWriter, r *http.Request) {
 
 	var d Driver
 	err = db.QueryRow(r.Context(),
-		"SELECT id_number, first_name, last_name, phone_number FROM drivers WHERE id_number=$1", id,
-	).Scan(&d.IDNumber, &d.FirstName, &d.LastName, &d.PhoneNumber)
+		"SELECT id, first_name, last_name, id_number, phone_number FROM drivers WHERE id=$1", id,
+	).Scan(&d.ID, &d.FirstName, &d.LastName, &d.IDNumber, &d.PhoneNumber)
 
 	if err != nil {
 		http.Error(w, "Driver not found", http.StatusNotFound)
@@ -109,13 +112,13 @@ func GetDriverByIDHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(d)
 }
 
+// ========================= LOGIN ===========================
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Only POST allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Accept IDNumber as string to match frontend input
 	var creds struct {
 		IDNumber string `json:"idNumber"`
 		Password string `json:"password"`
@@ -126,40 +129,38 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Convert IDNumber to int
 	idNum, err := strconv.Atoi(creds.IDNumber)
 	if err != nil {
 		http.Error(w, "Invalid ID number", http.StatusBadRequest)
 		return
 	}
 
-	// Check DB for driver
+	var dbID int
 	var storedPassword string
+
 	err = db.QueryRow(r.Context(),
-		"SELECT password FROM drivers WHERE id_number=$1", idNum,
-	).Scan(&storedPassword)
+		"SELECT id, password FROM drivers WHERE id_number=$1", idNum,
+	).Scan(&dbID, &storedPassword)
 	if err != nil {
 		http.Error(w, "Driver not found", http.StatusNotFound)
 		return
 	}
 
-	// Check password
 	if storedPassword != creds.Password {
 		http.Error(w, "Incorrect password", http.StatusUnauthorized)
 		return
 	}
 
-	// Success — return JSON
 	resp := map[string]interface{}{
-		"driverId": idNum,
-		"message":  "Login successful",
+		"id":      dbID,
+		"message": "Login successful",
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
 }
 
-// UpdateDriverLocationHandler updates driver's latitude and longitude
+// ========================= UPDATE DRIVER LOCATION ===========================
 func UpdateDriverLocationHandler(w http.ResponseWriter, r *http.Request) {
 	if db == nil {
 		http.Error(w, "Database not initialized", http.StatusInternalServerError)
@@ -185,7 +186,7 @@ func UpdateDriverLocationHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, err = db.Exec(r.Context(),
-		"UPDATE drivers SET latitude=$1, longitude=$2 WHERE id_number=$3",
+		"UPDATE drivers SET latitude=$1, longitude=$2 WHERE id=$3",
 		loc.Latitude, loc.Longitude, id,
 	)
 	if err != nil {
@@ -197,7 +198,7 @@ func UpdateDriverLocationHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Location updated successfully"))
 }
 
-// GetDriverLocationHandler returns driver’s latest location
+// ========================= GET DRIVER LOCATION ===========================
 func GetDriverLocationHandler(w http.ResponseWriter, r *http.Request) {
 	if db == nil {
 		http.Error(w, "Database not initialized", http.StatusInternalServerError)
@@ -217,7 +218,7 @@ func GetDriverLocationHandler(w http.ResponseWriter, r *http.Request) {
 		Longitude float64 `json:"longitude"`
 	}
 	err = db.QueryRow(r.Context(),
-		"SELECT latitude, longitude FROM drivers WHERE id_number=$1", id,
+		"SELECT latitude, longitude FROM drivers WHERE id=$1", id,
 	).Scan(&loc.Latitude, &loc.Longitude)
 
 	if err != nil {
@@ -228,7 +229,7 @@ func GetDriverLocationHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(loc)
 }
 
-// RegisterDriverRoutes registers the driver endpoints to the router
+// ========================= ROUTE REGISTRATION ===========================
 func RegisterDriverRoutes(r *mux.Router) {
 	r.HandleFunc("/register", RegisterHandler).Methods("POST")
 	r.HandleFunc("/login", LoginHandler).Methods("POST")
